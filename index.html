@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Naogaon PBS-1 All Substation Monitor</title>
+
+<style>
+body{
+  font-family: Arial;
+  margin:0;
+  background:#f0f2f5;
+}
+
+.header{
+  background:#ffffff;
+  padding:15px;
+  font-size:24px;
+  font-weight:bold;
+  box-shadow:0 2px 5px rgba(0,0,0,0.2);
+}
+
+.container{
+  display:grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap:15px;
+  padding:15px;
+}
+
+.btn{
+  padding:20px;
+  font-size:20px;
+  font-weight:bold;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  box-shadow:0 4px 8px rgba(0,0,0,0.2);
+  transition:0.2s;
+}
+
+.btn:hover{
+  transform:scale(1.05);
+}
+
+/* Colors */
+.red{background:#e8a0a0;}
+.blue{background:#20bcd4;}
+.cyan{background:#22d3ee;}
+.green{background:#00ff00;}
+.orange{background:#e8c19f;}
+
+iframe{
+  width:100%;
+  height:600px;
+  border:none;
+  background:white;
+}
+</style>
+
+<script>
+function openDashboard(page)
+{
+  document.getElementById("frame").src = "dashboard/" + page;
+}
+</script>
+
+</head>
+
+<body>
+
+<div class="header">
+☰ Naogaon PBS-1 All Substation Monitor
+</div>
+
+<div class="container">
+
+<button class="btn red" onclick="openDashboard('NG1.html')">NG1 (Sodor)</button>
+<button class="btn blue" onclick="openDashboard('AT2.html')">AT2 (Atrai-Indoor)</button>
+<button class="btn red" onclick="openDashboard('NG2.html')">NG2 (Hogolbari)</button>
+<button class="btn blue" onclick="openDashboard('AT3.html')">AT3 (Bandaikhara)</button>
+<button class="btn red" onclick="openDashboard('NG3.html')">NG3 (Dubolhati)</button>
+<button class="btn blue" onclick="openDashboard('MAN1.html')">MAN1 (Mandra)</button>
+<button class="btn red" onclick="openDashboard('MO2.html')">MO2 (Chowmasia)</button>
+<button class="btn blue" onclick="openDashboard('MAN2.html')">MAN2 (Deluabari)</button>
+<button class="btn cyan" onclick="openDashboard('BAD1.html')">BAD1 (Bodolgachi)</button>
+<button class="btn cyan" onclick="openDashboard('MAN3.html')">MAN3 (Sotihat)</button>
+<button class="btn green" onclick="openDashboard('RA1.html')">RA1 (Raninagor)</button>
+<button class="btn orange" onclick="openDashboard('NIA1.html')">NIA1 (Niamatpur)</button>
+<button class="btn green" onclick="openDashboard('RA2.html')">RA2 (Abadpukur)</button>
+<button class="btn orange" onclick="openDashboard('NIA2.html')">NIA2 (Sultanpur)</button>
+<button class="btn cyan" onclick="openDashboard('AT1.html')">AT1 (Atrai-Outdoor)</button>
+<button class="btn orange" onclick="openDashboard('NIA3.html')">NIA3 (Kapastia)</button>
+
+</div>
+
+<iframe id="frame"></iframe>
+
+</body>
+</html>
