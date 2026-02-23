@@ -17,6 +17,21 @@ body{
   font-size:24px;
   font-weight:bold;
   box-shadow:0 2px 5px rgba(0,0,0,0.2);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+/* Back button in header */
+#backBtn{
+  padding:8px 15px;
+  font-size:16px;
+  border:none;
+  border-radius:6px;
+  background:#555;
+  color:white;
+  cursor:pointer;
+  display:none;
 }
 
 .main{
@@ -69,24 +84,6 @@ iframe{
   border:none;
   background:white;
   border-radius:10px;
-  padding-top:50px; /* leave space for back button */
-  box-sizing:border-box;
-}
-
-/* Back button */
-#backBtn{
-  position:absolute;
-  top:10px;
-  left:10px;
-  padding:10px 15px;
-  font-size:16px;
-  border:none;
-  border-radius:6px;
-  background:#555;
-  color:white;
-  cursor:pointer;
-  display:none;
-  z-index:10; /* bring above iframe */
 }
 
 #welcome{
@@ -117,7 +114,8 @@ function goBack() {
 <body>
 
 <div class="header">
-☰ Naogaon PBS-1 All Substation Monitor
+  <div>☰ Naogaon PBS-1 All Substation Monitor</div>
+  <button id="backBtn" onclick="goBack()">← Back</button>
 </div>
 
 <div class="main">
@@ -142,7 +140,6 @@ function goBack() {
 </div>
 
 <div class="content">
-<button id="backBtn" onclick="goBack()">← Back</button>
 <div id="welcome">Select a Substation to view its dashboard</div>
 <iframe id="frame"></iframe>
 </div>
