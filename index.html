@@ -69,6 +69,8 @@ iframe{
   border:none;
   background:white;
   border-radius:10px;
+  padding-top:50px; /* leave space for back button */
+  box-sizing:border-box;
 }
 
 /* Back button */
@@ -84,6 +86,7 @@ iframe{
   color:white;
   cursor:pointer;
   display:none;
+  z-index:10; /* bring above iframe */
 }
 
 #welcome{
@@ -96,21 +99,15 @@ iframe{
 
 <script>
 function openDashboard(page) {
-  // Hide button panel
   document.querySelector('.container').style.display = 'none';
-  // Show back button
   document.getElementById('backBtn').style.display = 'block';
-  // Load dashboard
   document.getElementById('frame').src = 'dashboard/' + page;
   document.getElementById('welcome').style.display = 'none';
 }
 
 function goBack() {
-  // Show button panel
   document.querySelector('.container').style.display = 'block';
-  // Hide back button
   document.getElementById('backBtn').style.display = 'none';
-  // Clear iframe
   document.getElementById('frame').src = '';
   document.getElementById('welcome').style.display = 'block';
 }
@@ -151,11 +148,6 @@ function goBack() {
 </div>
 
 </div>
-
-</body>
-</html>
-
-<iframe id="frame"></iframe>
 
 </body>
 </html>
