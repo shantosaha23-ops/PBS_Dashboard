@@ -1,1 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Naogaon PBS-1 Dashboard</title>
 
+<style>
+body{margin:0;font-family:system-ui;background:#f5f7fb}
+.nav{display:flex;gap:10px;background:#2d9cff;color:#fff;padding:10px}
+.nav button{background:#fff;color:#2d9cff;border:none;padding:8px 14px;border-radius:6px;font-weight:600;cursor:pointer}
+.page{display:none;padding:10px}
+.page.active{display:block}
+iframe{width:100%;height:80vh;border:none}
+
+.filter{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+select,input,button{padding:6px;border-radius:6px;border:1px solid #ccc}
+
+table{width:100%;border-collapse:collapse;background:#fff;margin-top:10px}
+th,td{border:1px solid #ccc;padding:6px;text-align:center}
+th{background:#eaf3ff}
+.toggle-btn{background:#2d9cff;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;margin-left:10px}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+
+<body>
+
+<div class="nav">
+  <button onclick="showPage('monitor')">Feeder Monitor</button>
+  <button onclick="showPage('power')">Power Monitor</button> <!-- ✅ NEW -->
+  <button onclick="showPage('history')">Feeder History</button>
+  <button onclick="showPage('saifi')">SAIFI / SAIDI</button>
+</div>
+
+<div class="page active" id="monitor">
+  <iframe src="Dubolhati.html"></iframe>
+</div>
+
+<!-- ✅ NEW POWER MONITOR PAGE -->
+<div class="page" id="power">
+  <iframe src="power.html"></iframe>
+</div>
+
+<div class="page" id="history">
+  <div class="filter">
+    <select id="feederFilter"><option value="">All Feeders</option></select>
+    <select id="eventFilter">
+      <option value="">All Events</option>
+      <option value="OFF → ON">OFF → ON</option>
+      <option value="ON → OFF">ON → OFF</option>
+    </select>
+    <input type="date" id="fromDate">
+    <input type="date" id="toDate">
+    <button onclick="applyFilter()">Apply</button>
+    <button onclick="exportExcel()">⬇ Excel</button>
+    <button onclick="exportHistoryPDF()">📄 PDF</button>
+  </div>
+
+  <table id="historyTable">
+    <thead>
+      <tr>
+        <th>Timestamp</th><th>Feeder</th><th>Event</th>
+        <th>Status</th><th>Duration(s)</th><th>Last Status</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="page" id="saifi">
+  <div class="filter">
+    <input type="month" id="saifiMonthFilter">
+    <button onclick="applySAIFIFilter()">Apply</button>
+    <button onclick="exportSAIDIPDF()">📄 PDF</button>
+    <button class="toggle-btn" onclick="toggleChartTable()">Toggle Chart/Table</button>
+  </div>
+
+  <canvas id="chart" height="120"></canvas>
+
+  <table id="saidiTable">
+    <thead>
+      <tr>
+        <th>Month</th><th>Feeder</th><th>Customers</th><th>Interruptions</th>
+        <th>Outage Minutes</th><th>SAIFI</th><th>SAIDI</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const WEB_APP_URL="https://script.google.com/macros/s/AKfycbxD3HhbOsw8e_Nrcwckc1rI-6S8ytQrSg6Gz6ToDh9el7uXfriqWf2Ubb16VolgrXVWWw/exec";
+let dataCache, chart, currentPage='monitor';
+let chartVisible = true;
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  currentPage=id;
+  loadData(id);
+}
+
+async function loadData(page){
+  if(page==="power" || page==="monitor") return; // ✅ no API call needed
+
+  try{
+    const r=await fetch(WEB_APP_URL);
+    dataCache=await r.json();
+  }catch(e){console.error("Failed to fetch data:",e); return;}
+
+  if(page==="history") initHistory();
+  if(page==="saifi") drawChart();
+}
+
+/* -------- rest of your JS unchanged -------- */
+</script>
+
+</body>
+</html>
