@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Naogaon PBS-1 Dashboard</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#f5f7fb}
+.nav{display:flex;gap:10px;background:#2d9cff;color:#fff;padding:10px}
+.nav button{background:#fff;color:#2d9cff;border:none;padding:8px 14px;border-radius:6px;font-weight:600;cursor:pointer}
+.page{display:none;padding:10px}
+.page.active{display:block}
+iframe{width:100%;height:80vh;border:none}
+.filter{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+select,input,button{padding:6px;border-radius:6px;border:1px solid #ccc}
+table{width:100%;border-collapse:collapse;background:#fff;margin-top:10px}
+th,td{border:1px solid #ccc;padding:6px;text-align:center}
+th{background:#eaf3ff}
+.toggle-btn{background:#2d9cff;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;margin-left:10px}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+
+<body>
+
+<div class="nav">
+  <button onclick="showPage('monitor')">Feeder Monitor</button>
+  <button onclick="showPage('power')">Power Monitor</button>
+  <button onclick="showPage('history')">Feeder History</button>
+  <button onclick="showPage('saifi')">SAIFI / SAIDI</button>
+</div>
+
+<div class="page active" id="monitor">
+  <iframe src="Hogolbari.html"></iframe>
+</div>
+<div class="page" id="power">
+  <iframe src="powerhogolbari.html"></iframe>
+</div>
+
+<div class="page" id="history">
+  <div class="filter">
+    <select id="feederFilter"><option value="">All Feeders</option></select>
+    <select id="eventFilter">
+      <option value="">All Events</option>
+      <option value="OFF → ON">OFF → ON</option>
+      <option value="ON → OFF">ON → OFF</option>
+    </select>
+    <input type="date" id="fromDate">
+    <input type="date" id="toDate">
+    <button onclick="applyFilter()">Apply</button>
+    <button onclick="exportExcel('historyTable','history.xlsx')">⬇ Excel</button>
+    <button onclick="exportHistoryPDF()">📄 PDF</button>
+  </div>
+  <table id="historyTable">
+    <thead>
+      <tr>
+        <th>Timestamp</th><th>Feeder</th><th>Event</th>
+        <th>Status</th><th>Duration(s)</th><th>Last Status</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="page" id="saifi">
+  <div class="filter">
+    <input type="month" id="saifiMonthFilter">
+    <button onclick="applySAIFIFilter()">Apply</button>
+    <button onclick="exportExcel('saidiTable','saifi.xlsx')">⬇ Excel</button>
+    <button onclick="exportSAIDIPDF()">📄 PDF</button>
+    <button class="toggle-btn" onclick="toggleChartTable()">Toggle Chart/Table</button>
+  </div>
+  <canvas id="chart" height="120"></canvas>
+  <table id="saidiTable">
+    <thead>
+      <tr>
+        <th>Month</th><th>Feeder</th><th>Customers</th><th>Interruptions</th>
+        <th>Outage Minutes</th><th>SAIFI</th><th>SAIDI</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbypQx-W2_nPf-gkB7tPy_m_PQJyCdgU-bZ2X8ychsspBTW39PEhUBh2IRTVjQRNZPKm/exec"; // <--- Replace with your deployed Web App URL
+let dataCache = { history: [], reliability: [] }, chart;
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  loadData(id);
+}
+
+// ---------------- Load Data ----------------
+async function loadData(page){
+  if(page==="monitor"||page==="power") return;
+  try{
+    const r=await fetch(`${WEB_APP_URL}?mode=history`);
+    dataCache=await r.json();
+  }catch(e){console.error("Failed to fetch data:",e); return;}
+  if(page==="history") initHistory();
+  if(page==="saifi") initSAIFI();
+}
+
+// ---------------- History ----------------
+function initHistory(){
+  const tbody = document.querySelector("#historyTable tbody");
+  tbody.innerHTML = "";
+
+  const feederFilterValue = document.getElementById("feederFilter").value;
+  const eventFilterValue = document.getElementById("eventFilter").value;
+  const fromDateValue = document.getElementById("fromDate").value;
+  const toDateValue = document.getElementById("toDate").value;
+
+  const feederFilter = document.getElementById("feederFilter");
+  feederFilter.innerHTML = `<option value="">All Feeders</option>`;
+
+  dataCache.history.forEach(row => {
+    // Add feeder to dropdown
+    if (!Array.from(feederFilter.options).some(o => o.value === row.FeederID)) {
+      feederFilter.innerHTML += `<option value="${row.FeederID}">${row.FeederID}</option>`;
+    }
+
+    // Filter logic
+    if (feederFilterValue && row.FeederID !== feederFilterValue) return;
+    if (eventFilterValue && row.Event !== eventFilterValue) return;
+    if (fromDateValue && new Date(row.Timestamp) < new Date(fromDateValue)) return;
+    if (toDateValue && new Date(row.Timestamp) > new Date(toDateValue)) return;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${new Date(row.Timestamp).toLocaleString("en-GB",{hour12:false})}</td>
+      <td>${row.FeederID}</td>
+      <td>${row.Event}</td>
+      <td>${row.Status}</td>
+      <td>${row.DurationSeconds}</td>
+      <td>${row.LastStatus}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------------- SAIFI / SAIDI ----------------
+function initSAIFI(){
+  const monthFilterValue = document.getElementById("saifiMonthFilter").value; // format YYYY-MM
+  const tbody = document.querySelector("#saidiTable tbody");
+  tbody.innerHTML = "";
+
+  const filteredData = dataCache.reliability.filter(r => {
+    if (monthFilterValue && !r.Month.startsWith(monthFilterValue)) return false;
+    return true;
+  });
+
+  filteredData.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.Month}</td>
+      <td>${r.Feeder}</td>
+      <td>${r.Customers}</td>
+      <td>${r.Interruptions}</td>
+      <td>${r.OutageMinutes}</td>
+      <td>${r.SAIFI.toFixed(2)}</td>
+      <td>${r.SAIDI.toFixed(2)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  drawBarChart(filteredData);
+}
+
+// ---------------- Pillar chart with filtered data ----------------
+function drawBarChart(filteredData = dataCache.reliability){
+  const labels = [], saifi = [], saidi = [];
+  filteredData.forEach(r => {
+    labels.push(`${r.Month} ${r.Feeder}`);
+    saifi.push(r.SAIFI);
+    saidi.push(r.SAIDI);
+  });
+
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart"),{
+    type:"bar",
+    data:{
+      labels,
+      datasets:[
+        {label:"SAIFI", data:saifi, backgroundColor:"#2d9cff"},
+        {label:"SAIDI", data:saidi, backgroundColor:"#e74c3c"}
+      ]
+    },
+    options:{responsive:true, scales:{y:{beginAtZero:true}}}
+  });
+}
+
+// ---------------- Filters / Exports ----------------
+function applyFilter(){ initHistory(); }
+function applySAIFIFilter(){ initSAIFI(); }
+function exportExcel(tableId, filename){
+  const table=document.getElementById(tableId);
+  const wb=XLSX.utils.table_to_book(table,{sheet:"Sheet1"});
+  XLSX.writeFile(wb, filename);
+}
+function exportHistoryPDF(){
+  const doc=new jspdf.jsPDF();
+  doc.autoTable({html:"#historyTable"});
+  doc.save("history.pdf");
+}
+function exportSAIDIPDF(){
+  const doc=new jspdf.jsPDF();
+  doc.autoTable({html:"#saidiTable"});
+  doc.save("saifi.pdf");
+}
+function toggleChartTable(){
+  const chartEl=document.getElementById("chart");
+  const tableEl=document.getElementById("saidiTable");
+  if(chartEl.style.display==="none"){ chartEl.style.display="block"; tableEl.style.display="none"; }
+  else{ chartEl.style.display="none"; tableEl.style.display="table"; }
+}
+
+// Load initial page
+showPage('monitor');
+</script>
+
+</body>
+</html>

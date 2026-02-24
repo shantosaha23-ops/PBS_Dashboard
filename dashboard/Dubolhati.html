@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Naogaon PBS-1 Substation Monitor</title>
+
+<style>
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --primary:#2d9cff;
+  --danger:#c62828;
+}
+body{
+  margin:12px;
+  font-family:system-ui,Roboto;
+  background:var(--bg);
+  color:#111;
+}
+h1{text-align:center;font-size:20px;margin:8px 0 14px;}
+#controls{display:flex;gap:10px;justify-content:center;align-items:center;margin-bottom:6px;}
+button{padding:10px 14px;border:0;border-radius:8px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer;}
+#onlineStatus{padding:6px 10px;border-radius:6px;font-weight:bold;color:#fff;background:#888;}
+#refreshMsg{text-align:center;font-size:12px;font-weight:700;min-height:16px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;}
+.card{
+  background:var(--card);
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 2px 6px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+.label{font-weight:700;margin:0;}
+.row{display:flex;align-items:center;}
+.led{width:14px;height:14px;border-radius:50%;margin-right:8px;background:#bbb;}
+.led.on{background:#2ecc71;}
+.led.off{background:#e74c3c;}
+.led.blink{animation: blink 1s infinite;}
+@keyframes blink{
+  0%,50%,100%{opacity:1;}
+  25%,75%{opacity:0;}
+}
+.statusText{font-weight:700;margin-top:6px;}
+.trip{font-size:12px;color:var(--danger);margin-top:4px;font-weight:700;}
+.last{font-size:12px;margin-top:2px;word-wrap:break-word;white-space:normal;max-height:80px;overflow-y:auto;}
+.footer{text-align:center;margin-top:30px;font-size:13px;color:#333;}
+</style>
+</head>
+
+<body>
+
+<h1>Naogaon 3(Dubolhati) Substation Feeder Status</h1>
+
+<div id="controls">
+  <button onclick="refreshDashboard()">🔄 Refresh</button>
+  <div id="onlineStatus">Connecting...</div>
+</div>
+
+<div id="refreshMsg"></div>
+
+<div class="grid" id="grid"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<script>
+// ---------------- FIREBASE ----------------
+firebase.initializeApp({
+  apiKey:"AIzaSyAOjviJmtqS_fVF977TneBkszWM_DZoEO0",
+  authDomain:"dubolhati-fb64f.firebaseapp.com",
+  databaseURL:"https://dubolhati-fb64f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"dubolhati-fb64f",
+  appId:"1:382240730885:web:73b0f0770acb538a54116c"
+});
+const db=firebase.database();
+
+// ---------------- FEEDERS ----------------
+const relays=[
+  {id:'relay1',name:'Feeder 1A'},
+  {id:'relay2',name:'Feeder 2B'},
+  {id:'relay3',name:'Feeder 3C'},
+  {id:'relay4',name:'Feeder 5E'},
+  {id:'relay5',name:'Feeder 6F'},
+  
+];
+
+// ---------------- BUILD UI ----------------
+const grid=document.getElementById("grid");
+relays.forEach((r,i)=>{
+  grid.innerHTML+=`
+  <div class="card" onclick="toggleArea(${i})">
+
+    <div class="row" style="align-items:center; margin-bottom:6px;">
+      <div class="led" id="led${i}" style="margin-right:8px;"></div>
+      <div class="label">${r.name}</div>
+    </div>
+
+    <div class="statusText" id="status${i}">Status: --</div>
+
+    <div id="tripBox${i}">
+      <div class="trip">This Month Trips: <span id="cur${i}">0</span></div>
+      <div class="trip">Last Month Trips: <span id="pre${i}">0</span></div>
+      <div class="last" id="lastTrip${i}">Last Trip: --</div>
+      <div class="last" id="lastOn${i}">Last ON: --</div>
+    </div>
+
+    <div class="last" id="area${i}" style="display:none;padding:4px;border:1px solid #2d9cff;border-radius:6px;background:#f0f8ff;"></div>
+
+  </div>`;
+});
+
+// ---------------- TIME FORMAT ----------------
+function fmt(t){
+  if(!t||t==="--")return"--";
+  if(t.includes("T")){
+    return new Date(t).toLocaleString("en-GB",{timeZone:"Asia/Dhaka",hour12:false});
+  }
+  const p=t.split(" ");
+  const d=p[0].split("-");
+  return `${d[2]}-${d[1]}-${d[0]} ${p[1]}`;
+}
+
+// ---------------- FIREBASE STATUS ----------------
+async function fetchFirebase(){
+  let offline=false;
+  const now=Math.floor(Date.now()/1000);
+  const data=[];
+  for(let i=0;i<relays.length;i++){
+    const s=await db.ref(relays[i].id).get();
+    const d=s.val()||{};
+    data.push(d);
+    if(now-(d.lastUpdateEpoch||0)>120){
+      offline=true;
+    }
+  }
+  for(let i=0;i<relays.length;i++){
+    const st = offline ? "--" : (data[i].status || "--");
+    document.getElementById("status"+i).textContent="Status: "+st;
+    const led = document.getElementById("led"+i);
+    led.className = "led "+(
+      st==="ON" ? "on" :
+      st==="OFF" ? "off blink" : ""
+    );
+  }
+  const os=document.getElementById("onlineStatus");
+  os.textContent=offline?"Offline":"Online";
+  os.style.background=offline?"#e74c3c":"#2ecc71";
+}
+
+// ---------------- MAIN SHEET ----------------
+const sheetURL="https://script.google.com/macros/s/AKfycbzmrlZw982fqF6sAfJGXgQuw-3XVio7dScGqCKxH4Lshm8iocZVxvIYCuEgUf3sqARS/exec?mode=trip";
+
+// ---------------- FEEDER AREA SHEET ----------------
+const feederAreaURL="https://script.google.com/macros/s/AKfycbzmrlZw982fqF6sAfJGXgQuw-3XVio7dScGqCKxH4Lshm8iocZVxvIYCuEgUf3sqARS/exec?mode=area";
+
+// ---------------- LOAD TRIP DATA ----------------
+async function fetchSheet(){
+  const r=await axios.get(sheetURL);
+  r.data.forEach((row,i)=>{
+    document.getElementById("cur"+i).textContent=row.thisMonthTrips||0;
+    document.getElementById("pre"+i).textContent=row.lastMonthTrips||0;
+    document.getElementById("lastTrip"+i).textContent="Last Trip: "+fmt(row.lastTripTime);
+    document.getElementById("lastOn"+i).textContent="Last ON: "+fmt(row.lastOnTime);
+  });
+}
+
+// ---------------- TOGGLE AREA ----------------
+let activeCards = {};
+let areaTimers = {};
+
+async function toggleArea(index){
+  const isOpen = activeCards[index];
+
+  if(isOpen){ resetArea(index); return; }
+
+  activeCards[index] = true;
+
+  try{
+    const r = await axios.get(feederAreaURL);
+    const row = r.data[index];
+
+    // Hide trips
+    document.getElementById("tripBox"+index).style.display="none";
+
+    // Show area
+    const area = document.getElementById("area"+index);
+    area.style.display = "block";
+    area.innerHTML = "<b>Area:</b> "+(row.area || "--");
+
+    // Clear previous timer if any
+    if(areaTimers[index]) clearTimeout(areaTimers[index]);
+
+    // Auto reset after 15s
+    areaTimers[index] = setTimeout(()=>{ resetArea(index); },15000);
+
+  }catch(err){
+    console.log("Area load error", err);
+  }
+}
+
+function resetArea(index){
+  document.getElementById("tripBox"+index).style.display="block";
+
+  const area=document.getElementById("area"+index);
+  area.style.display="none";
+  area.innerHTML="";
+
+  activeCards[index] = false;
+
+  if(areaTimers[index]){
+    clearTimeout(areaTimers[index]);
+    areaTimers[index] = null;
+  }
+}
+
+// ---------------- REFRESH ----------------
+async function refreshDashboard(){
+  const msg=document.getElementById("refreshMsg");
+  msg.textContent="Refreshing...";
+  msg.style.color="#c62828";
+  await fetchFirebase();
+  await fetchSheet();
+  msg.textContent="Refresh complete";
+  msg.style.color="#2ecc71";
+  setTimeout(()=>{msg.textContent="";},2000);
+}
+
+refreshDashboard();
+setInterval(refreshDashboard,30000);
+
+</script>
+
+<div class="footer">
+<b>Developed by: Shanta Saha</b><br>
+AGM (O&amp;M)<br>
+Naogaon PBS-1
+</div>
+
+</body>
+</html>
