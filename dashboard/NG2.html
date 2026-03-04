@@ -53,7 +53,7 @@ th{background:#eaf3ff}
     <input type="date" id="fromDate">
     <input type="date" id="toDate">
     <button onclick="applyFilter()">Apply</button>
-    <button onclick="exportExcel('historyTable','history.xlsx')">⬇ Excel</button>
+    <button onclick="exportExcel('historyTable','NG2_History.xlsx')">⬇ Excel</button>
     <button onclick="exportHistoryPDF()">📄 PDF</button>
   </div>
   <table id="historyTable">
@@ -71,7 +71,7 @@ th{background:#eaf3ff}
   <div class="filter">
     <input type="month" id="saifiMonthFilter">
     <button onclick="applySAIFIFilter()">Apply</button>
-    <button onclick="exportExcel('saidiTable','saifi.xlsx')">⬇ Excel</button>
+    <button onclick="exportExcel('saidiTable','NG2_Saifi.xlsx')">⬇ Excel</button>
     <button onclick="exportSAIDIPDF()">📄 PDF</button>
     <button class="toggle-btn" onclick="toggleChartTable()">Toggle Chart/Table</button>
   </div>
@@ -165,8 +165,8 @@ function initSAIFI(){
       <td>${r.Customers}</td>
       <td>${r.Interruptions}</td>
       <td>${r.OutageMinutes}</td>
-      <td>${r.SAIFI.toFixed(2)}</td>
-      <td>${r.SAIDI.toFixed(2)}</td>
+      <td>${r.SAIFI.toFixed(4)}</td>
+      <td>${r.SAIDI.toFixed(4)}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -208,12 +208,12 @@ function exportExcel(tableId, filename){
 function exportHistoryPDF(){
   const doc=new jspdf.jsPDF();
   doc.autoTable({html:"#historyTable"});
-  doc.save("history.pdf");
+  doc.save("NG2_History.pdf");
 }
 function exportSAIDIPDF(){
   const doc=new jspdf.jsPDF();
   doc.autoTable({html:"#saidiTable"});
-  doc.save("saifi.pdf");
+  doc.save("NG2_Saifi.pdf");
 }
 function toggleChartTable(){
   const chartEl=document.getElementById("chart");
@@ -227,4 +227,5 @@ showPage('monitor');
 </script>
 
 </body>
+
 </html>
