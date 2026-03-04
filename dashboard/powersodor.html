@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Power Monitoring Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+  body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background: linear-gradient(135deg, #e0f2ff, #f5f7fb);
+    color: #222;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background 0.5s;
+  }
+
+  .dashboard {
+    width: 95%;
+    max-width: 480px;
+    padding: 20px;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    overflow: hidden;
+    animation: fadeIn 1s ease;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #2d9cff, #1b6ed5);
+    color: #fff;
+    padding: 20px;
+    border-radius: 16px;
+    text-align: center;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  }
+
+  .header h1 {
+    margin: 0;
+    font-size: 1.8em;
+    font-weight: 700;
+  }
+
+  .status {
+    margin-top: 8px;
+    font-size: 0.95em;
+    font-weight: 500;
+  }
+
+  .status.online { color: #c8ffdc; }
+  .status.offline { color: #ffd2d2; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 18px;
+  }
+
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s;
+  }
+
+  .card:hover {
+    transform: translateY(-5px);
+  }
+
+  .card::after {
+    display: none;
+  }
+
+  .label {
+    font-size: 0.85em;
+    color: #666;
+  }
+
+  .value {
+    font-size: 1.8em;
+    font-weight: 600;
+    margin-top: 8px;
+    color: #111;
+    transition: color 0.3s;
+  }
+
+  /* Power card slightly smaller by 20% */
+  #powerCard {
+    grid-column: span 2;
+    padding: 20px;
+    font-size: 2.4em; /* reduced 20% from 3em */
+    text-align: center;
+  }
+
+  .wide { grid-column: span 2; }
+
+  .update-time {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 0.7em;
+    color: #555;
+  }
+
+  @keyframes fadeIn {
+    from {opacity: 0; transform: translateY(20px);}
+    to {opacity: 1; transform: translateY(0);}
+  }
+</style>
+</head>
+<body>
+
+<div class="dashboard" id="dashboard">
+  <div class="header">
+    <h1>Naogaon-1(Sodor) SS Power Monitor</h1>
+    <div id="status" class="status">--</div>
+  </div>
+
+  <div class="grid">
+    <div class="card" id="powerCard">
+      <div class="label">Power (MW)</div>
+      <div id="power" class="value">----</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Voltage (KV)</div>
+      <div id="voltage" class="value">----</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Current (A)</div>
+      <div id="current" class="value">----</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Power Factor</div>
+      <div id="pf" class="value">----</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Frequency (Hz)</div>
+      <div id="freq" class="value">----</div>
+    </div>
+  </div>
+
+  <div id="lastUpdate" class="update-time">Last update: ----</div>
+</div>
+
+<script>
+const firebaseURL = "https://naogaon-ss-default-rtdb.asia-southeast1.firebasedatabase.app/power.json";
+let lastUpdateTs = 0;
+const OFFLINE_TIMEOUT = 2 * 60 * 1000;
+
+function setOfflineView() {
+  ["voltage","current","power","freq","pf"].forEach(id => {
+    document.getElementById(id).textContent = "----";
+  });
+  document.getElementById("lastUpdate").textContent = "Last update: ----";
+  const st = document.getElementById("status");
+  st.textContent = "OFFLINE";
+  st.className = "status offline";
+}
+
+async function fetchPowerData() {
+  try {
+    const res = await fetch(firebaseURL);
+    const data = await res.json();
+
+    if (data && data.lastUpdate) {
+      const ts = new Date(data.lastUpdate).getTime();
+      lastUpdateTs = ts;
+
+      const now = Date.now();
+      if (now - lastUpdateTs > OFFLINE_TIMEOUT) {
+        setOfflineView();
+        return;
+      }
+
+      document.getElementById("voltage").textContent = data.voltage.toFixed(1);
+      document.getElementById("current").textContent = data.current.toFixed(2);
+      document.getElementById("power").textContent = data.power.toFixed(1);
+      document.getElementById("freq").textContent = data.frequency.toFixed(2);
+      document.getElementById("pf").textContent = data.pf.toFixed(2);
+      document.getElementById("lastUpdate").textContent = "Last update: " + data.lastUpdate;
+
+      const st = document.getElementById("status");
+      st.textContent = "ONLINE";
+      st.className = "status online";
+    } else {
+      if (Date.now() - lastUpdateTs > OFFLINE_TIMEOUT) setOfflineView();
+    }
+  } catch(e) {
+    if (Date.now() - lastUpdateTs > OFFLINE_TIMEOUT) setOfflineView();
+  }
+}
+
+setInterval(fetchPowerData, 5000);
+fetchPowerData();
+</script>
+
+</body>
+</html>
