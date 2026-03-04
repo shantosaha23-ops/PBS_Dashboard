@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Naogaon PBS-1 Dashboard</title>
 
@@ -12,10 +12,8 @@ body{margin:0;font-family:system-ui;background:#f5f7fb}
 .page{display:none;padding:10px}
 .page.active{display:block}
 iframe{width:100%;height:80vh;border:none}
-
 .filter{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 select,input,button{padding:6px;border-radius:6px;border:1px solid #ccc}
-
 table{width:100%;border-collapse:collapse;background:#fff;margin-top:10px}
 th,td{border:1px solid #ccc;padding:6px;text-align:center}
 th{background:#eaf3ff}
@@ -32,12 +30,16 @@ th{background:#eaf3ff}
 
 <div class="nav">
   <button onclick="showPage('monitor')">Feeder Monitor</button>
+  <button onclick="showPage('power')">Power Monitor</button>
   <button onclick="showPage('history')">Feeder History</button>
   <button onclick="showPage('saifi')">SAIFI / SAIDI</button>
 </div>
 
 <div class="page active" id="monitor">
   <iframe src="sodor.html"></iframe>
+</div>
+<div class="page" id="power">
+  <iframe src="powersodor.html"></iframe>
 </div>
 
 <div class="page" id="history">
@@ -51,10 +53,9 @@ th{background:#eaf3ff}
     <input type="date" id="fromDate">
     <input type="date" id="toDate">
     <button onclick="applyFilter()">Apply</button>
-    <button onclick="exportExcel()">⬇ Excel</button>
+    <button onclick="exportExcel('historyTable','NG1_History.xlsx')">⬇ Excel</button>
     <button onclick="exportHistoryPDF()">📄 PDF</button>
   </div>
-
   <table id="historyTable">
     <thead>
       <tr>
@@ -70,12 +71,11 @@ th{background:#eaf3ff}
   <div class="filter">
     <input type="month" id="saifiMonthFilter">
     <button onclick="applySAIFIFilter()">Apply</button>
+    <button onclick="exportExcel('saidiTable','NG1_Saifi.xlsx')">⬇ Excel</button>
     <button onclick="exportSAIDIPDF()">📄 PDF</button>
     <button class="toggle-btn" onclick="toggleChartTable()">Toggle Chart/Table</button>
   </div>
-
   <canvas id="chart" height="120"></canvas>
-
   <table id="saidiTable">
     <thead>
       <tr>
@@ -88,162 +88,145 @@ th{background:#eaf3ff}
 </div>
 
 <script>
-const WEB_APP_URL="https://script.google.com/macros/s/AKfycbxD3HhbOsw8e_Nrcwckc1rI-6S8ytQrSg6Gz6ToDh9el7uXfriqWf2Ubb16VolgrXVWWw/exec";
-let dataCache, chart, currentPage='monitor';
-let chartVisible = true;
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzKByjrXr6ifLA6af6XnKeNvvm4A0NvlTUa7beyDsqdMUsqwsl_1sPVh5o0t-jMbjIEow/exec"; // <--- Replace with your deployed Web App URL
+let dataCache = { history: [], reliability: [] }, chart;
 
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  currentPage=id;
   loadData(id);
 }
 
+// ---------------- Load Data ----------------
 async function loadData(page){
+  if(page==="monitor"||page==="power") return;
   try{
-    const r=await fetch(WEB_APP_URL);
+    const r=await fetch(`${WEB_APP_URL}?mode=history`);
     dataCache=await r.json();
   }catch(e){console.error("Failed to fetch data:",e); return;}
-
   if(page==="history") initHistory();
-  if(page==="saifi") drawChart();
+  if(page==="saifi") initSAIFI();
 }
 
-// -----------------------------
-// History
-// -----------------------------
+// ---------------- History ----------------
 function initHistory(){
-  const feeders=[...new Set(dataCache.history.map(r=>r.FeederID))];
-  feederFilter.innerHTML='<option value="">All Feeders</option>';
-  feeders.forEach(f=>feederFilter.innerHTML+=`<option>${f}</option>`);
-  renderHistoryTable(dataCache.history);
-}
+  const tbody = document.querySelector("#historyTable tbody");
+  tbody.innerHTML = "";
 
-function formatTimestamp(t){
-  const d=new Date(t);
-  const day=String(d.getDate()).padStart(2,'0');
-  const month=String(d.getMonth()+1).padStart(2,'0');
-  const year=d.getFullYear();
-  const hh=String(d.getHours()).padStart(2,'0');
-  const mm=String(d.getMinutes()).padStart(2,'0');
-  const ss=String(d.getSeconds()).padStart(2,'0');
-  return `${day}/${month}/${year}, ${hh}:${mm}:${ss}`;
-}
+  const feederFilterValue = document.getElementById("feederFilter").value;
+  const eventFilterValue = document.getElementById("eventFilter").value;
+  const fromDateValue = document.getElementById("fromDate").value;
+  const toDateValue = document.getElementById("toDate").value;
 
-function renderHistoryTable(rows){
-  const tb=document.querySelector("#historyTable tbody");
-  tb.innerHTML="";
-  rows.forEach(r=>{
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${formatTimestamp(r.Timestamp)}</td>
-                  <td>${r.FeederID}</td>
-                  <td>${r.Event}</td>
-                  <td>${r.Status}</td>
-                  <td>${r.DurationSeconds}</td>
-                  <td>${r.LastStatus}</td>`;
-    tb.appendChild(tr);
+  const feederFilter = document.getElementById("feederFilter");
+  feederFilter.innerHTML = `<option value="">All Feeders</option>`;
+
+  dataCache.history.forEach(row => {
+    // Add feeder to dropdown
+    if (!Array.from(feederFilter.options).some(o => o.value === row.FeederID)) {
+      feederFilter.innerHTML += `<option value="${row.FeederID}">${row.FeederID}</option>`;
+    }
+
+    // Filter logic
+    if (feederFilterValue && row.FeederID !== feederFilterValue) return;
+    if (eventFilterValue && row.Event !== eventFilterValue) return;
+    if (fromDateValue && new Date(row.Timestamp) < new Date(fromDateValue)) return;
+    if (toDateValue && new Date(row.Timestamp) > new Date(toDateValue)) return;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${new Date(row.Timestamp).toLocaleString("en-GB",{hour12:false})}</td>
+      <td>${row.FeederID}</td>
+      <td>${row.Event}</td>
+      <td>${row.Status}</td>
+      <td>${row.DurationSeconds}</td>
+      <td>${row.LastStatus}</td>
+    `;
+    tbody.appendChild(tr);
   });
 }
 
-function applyFilter(){
-  let f=[...dataCache.history];
-  if(feederFilter.value) f=f.filter(r=>r.FeederID===feederFilter.value);
-  if(eventFilter.value) f=f.filter(r=>r.Event===eventFilter.value);
-  if(fromDate.value) f=f.filter(r=>new Date(r.Timestamp)>=new Date(fromDate.value));
-  if(toDate.value) f=f.filter(r=>new Date(r.Timestamp)<=new Date(toDate.value+"T23:59:59"));
-  renderHistoryTable(f);
-}
+// ---------------- SAIFI / SAIDI ----------------
+function initSAIFI(){
+  const monthFilterValue = document.getElementById("saifiMonthFilter").value; // format YYYY-MM
+  const tbody = document.querySelector("#saidiTable tbody");
+  tbody.innerHTML = "";
 
-function exportExcel(){
-  const wb=XLSX.utils.table_to_book(historyTable);
-  XLSX.writeFile(wb,"FeederHistory.xlsx");
-}
-
-function exportHistoryPDF(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const headers=[["Timestamp","Feeder","Event","Status","Duration(s)","Last Status"]];
-  const data=Array.from(document.querySelectorAll("#historyTable tbody tr"))
-                  .map(tr=>Array.from(tr.children).map(td=>td.textContent));
-  doc.autoTable({ head: headers, body: data });
-  const blob = doc.output("blob");
-  const url = URL.createObjectURL(blob);
-  window.open(url,"_blank");
-}
-
-// -----------------------------
-// SAIFI / SAIDI
-// -----------------------------
-function drawChart(){
-  let r=[...dataCache.reliability];
-
-  if(saifiMonthFilter.value){
-    r=r.filter(x=>x.Month.startsWith(saifiMonthFilter.value));
-  }
-
-  const tb=document.querySelector("#saidiTable tbody");
-  tb.innerHTML="";
-  r.forEach(x=>{
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${formatTimestamp(x.Month)}</td>
-                  <td>${x.FeederID}</td>
-                  <td>${x.Customers}</td>
-                  <td>${x.Interruptions}</td>
-                  <td>${x.OutageMinutes}</td>
-                  <td>${x.SAIFI}</td>
-                  <td>${x.SAIDI}</td>`;
-    tb.appendChild(tr);
+  const filteredData = dataCache.reliability.filter(r => {
+    if (monthFilterValue && !r.Month.startsWith(monthFilterValue)) return false;
+    return true;
   });
 
-  const labels=r.map(x=>x.FeederID);
-  const saifi=r.map(x=>parseFloat(x.SAIFI));
-  const saidi=r.map(x=>parseFloat(x.SAIDI));
+  filteredData.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.Month}</td>
+      <td>${r.Feeder}</td>
+      <td>${r.Customers}</td>
+      <td>${r.Interruptions}</td>
+      <td>${r.OutageMinutes}</td>
+      <td>${r.SAIFI.toFixed(4)}</td>
+      <td>${r.SAIDI.toFixed(4)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  drawBarChart(filteredData);
+}
+
+// ---------------- Pillar chart with filtered data ----------------
+function drawBarChart(filteredData = dataCache.reliability){
+  const labels = [], saifi = [], saidi = [];
+  filteredData.forEach(r => {
+    labels.push(`${r.Month} ${r.Feeder}`);
+    saifi.push(r.SAIFI);
+    saidi.push(r.SAIDI);
+  });
 
   if(chart) chart.destroy();
-  chart=new Chart(document.getElementById("chart"),{
+  chart = new Chart(document.getElementById("chart"),{
     type:"bar",
-    data:{ labels, datasets:[
-      {label:"SAIFI",data:saifi,backgroundColor:"#2d9cff"},
-      {label:"SAIDI",data:saidi,backgroundColor:"#e74c3c"}
-    ]},
-    options:{responsive:true,scales:{y:{beginAtZero:true}}}
+    data:{
+      labels,
+      datasets:[
+        {label:"SAIFI", data:saifi, backgroundColor:"#2d9cff"},
+        {label:"SAIDI", data:saidi, backgroundColor:"#e74c3c"}
+      ]
+    },
+    options:{responsive:true, scales:{y:{beginAtZero:true}}}
   });
-
-  // Show/hide based on toggle
-  document.getElementById("chart").style.display=chartVisible?"block":"none";
-  document.getElementById("saidiTable").style.display=chartVisible?"none":"table";
 }
 
-function applySAIFIFilter(){ drawChart(); }
-
-function toggleChartTable(){
-  chartVisible=!chartVisible;
-  document.getElementById("chart").style.display=chartVisible?"block":"none";
-  document.getElementById("saidiTable").style.display=chartVisible?"none":"table";
+// ---------------- Filters / Exports ----------------
+function applyFilter(){ initHistory(); }
+function applySAIFIFilter(){ initSAIFI(); }
+function exportExcel(tableId, filename){
+  const table=document.getElementById(tableId);
+  const wb=XLSX.utils.table_to_book(table,{sheet:"Sheet1"});
+  XLSX.writeFile(wb, filename);
 }
-
+function exportHistoryPDF(){
+  const doc=new jspdf.jsPDF();
+  doc.autoTable({html:"#historyTable"});
+  doc.save("NG1_History.pdf");
+}
 function exportSAIDIPDF(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const headers=[["Month","Feeder","Customers","Interruptions","Outage Minutes","SAIFI","SAIDI"]];
-  const data=Array.from(document.querySelectorAll("#saidiTable tbody tr"))
-                  .map(tr=>Array.from(tr.children).map(td=>td.textContent));
-  doc.autoTable({ head: headers, body: data });
-  const blob = doc.output("blob");
-  const url = URL.createObjectURL(blob);
-  window.open(url,"_blank");
+  const doc=new jspdf.jsPDF();
+  doc.autoTable({html:"#saidiTable"});
+  doc.save("NG1_Saifi.pdf");
+}
+function toggleChartTable(){
+  const chartEl=document.getElementById("chart");
+  const tableEl=document.getElementById("saidiTable");
+  if(chartEl.style.display==="none"){ chartEl.style.display="block"; tableEl.style.display="none"; }
+  else{ chartEl.style.display="none"; tableEl.style.display="table"; }
 }
 
-// Auto-refresh
-setInterval(()=>{
-  if(document.getElementById("history").classList.contains("active") ||
-     document.getElementById("saifi").classList.contains("active")){
-    loadData(currentPage);
-  }
-},60000);
-
-loadData("monitor");
+// Load initial page
+showPage('monitor');
 </script>
 
 </body>
 </html>
+
+
