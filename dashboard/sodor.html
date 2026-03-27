@@ -29,7 +29,6 @@ button{padding:10px 14px;border:0;border-radius:8px;background:var(--primary);co
   padding:12px;
   border-radius:12px;
   box-shadow:0 2px 6px rgba(0,0,0,.08);
-  cursor:pointer;
 }
 .label{font-weight:700;margin:0;}
 .row{display:flex;align-items:center;}
@@ -45,6 +44,7 @@ button{padding:10px 14px;border:0;border-radius:8px;background:var(--primary);co
 .trip{font-size:12px;color:var(--danger);margin-top:4px;font-weight:700;}
 .last{font-size:12px;margin-top:2px;word-wrap:break-word;white-space:normal;max-height:80px;overflow-y:auto;}
 .footer{text-align:center;margin-top:30px;font-size:13px;color:#333;}
+input{padding:4px 6px;border:1px solid #ccc;border-radius:4px;margin-right:6px;}
 </style>
 </head>
 
@@ -109,6 +109,8 @@ relays.forEach((r,i)=>{
 
     <div class="last" id="area${i}" style="display:none;padding:4px;border:1px solid #2d9cff;border-radius:6px;background:#f0f8ff;"></div>
 
+    <div class="last" id="faultCard${i}" style="display:none;padding:4px;border:1px solid #2d9cff;border-radius:6px;background:#f0f8ff;"></div>
+
   </div>`;
 });
 
@@ -152,8 +154,6 @@ async function fetchFirebase(){
 
 // ---------------- MAIN SHEET ----------------
 const sheetURL="https://script.google.com/macros/s/AKfycbxrVix1EsrXGzsCStuQSS86LqXux6yfFZmJG-5quxDq1BeIN5q3zkL95foVgErM6qxiPQ/exec";
-
-// ---------------- FEEDER AREA SHEET ----------------
 const feederAreaURL="https://script.google.com/macros/s/AKfycbzmhj1gpbUadSlWHwYq2UXuYbLA_HSESi85iiT0nYCgu1TeZ9KmpzqA-UjFuHeTCb3mTA/exec";
 
 // ---------------- LOAD TRIP DATA ----------------
@@ -173,29 +173,18 @@ let areaTimers = {};
 
 async function toggleArea(index){
   const isOpen = activeCards[index];
-
   if(isOpen){ resetArea(index); return; }
-
   activeCards[index] = true;
 
   try{
     const r = await axios.get(feederAreaURL);
     const row = r.data[index];
-
-    // Hide trips
     document.getElementById("tripBox"+index).style.display="none";
-
-    // Show area
     const area = document.getElementById("area"+index);
     area.style.display = "block";
     area.innerHTML = "<b>Area:</b> "+(row.area || "--");
-
-    // Clear previous timer if any
     if(areaTimers[index]) clearTimeout(areaTimers[index]);
-
-    // Auto reset after 15s
     areaTimers[index] = setTimeout(()=>{ resetArea(index); },15000);
-
   }catch(err){
     console.log("Area load error", err);
   }
@@ -203,17 +192,105 @@ async function toggleArea(index){
 
 function resetArea(index){
   document.getElementById("tripBox"+index).style.display="block";
-
   const area=document.getElementById("area"+index);
   area.style.display="none";
   area.innerHTML="";
-
   activeCards[index] = false;
-
   if(areaTimers[index]){
     clearTimeout(areaTimers[index]);
     areaTimers[index] = null;
   }
+}
+
+// ---------------- FAULT CARD ----------------
+const faultURL = "https://script.google.com/macros/s/AKfycbzAmBGNs3q6jCoz3H4W2u6Iz_rlcxZ-VU-ZRV8N-COiOtZKbTWJiPRbwmOx8UQaPhrtsQ/exec"; // replace with your Web App URL
+
+async function fetchFaults() {
+
+  try {
+
+    const res = await axios.get(faultURL);
+    const messages = res.data;
+
+    for (let i = 0; i < relays.length; i++) {
+
+      const st = document.getElementById("status"+i).textContent.split(": ")[1];
+      const faultCard = document.getElementById("faultCard"+i);
+
+      if (st === "ON") {
+
+        faultCard.style.display = "none";
+
+        // CLEAR FAULT FROM GOOGLE SHEET
+        const clearURL = faultURL + "?row=" + (i+2) + "&message=";
+        fetch(clearURL, {method:"POST", mode:"no-cors"});
+
+      }
+
+      else if (st === "OFF") {
+
+        const msg = messages[i] || "";
+
+        if(msg){
+
+          faultCard.innerHTML = "<b>Reason:</b> " + msg;
+
+        }else{
+
+          faultCard.innerHTML = `
+            <input type="text" id="faultInput${i}" placeholder="Enter Fault Reason">
+             <button type="button" onclick="saveFault(${i})">Save</button>
+          `;
+
+        }
+
+        faultCard.style.display = "block";
+
+      }
+
+      else {
+
+        faultCard.style.display = "none";
+
+      }
+
+    }
+
+  }
+
+  catch(err){
+
+    console.log("Fetch faults error", err);
+     alert("Error saving fault reason");
+
+  }
+
+}
+// ---------------- SAVE FAULT ----------------
+async function saveFault(index){
+
+  const input = document.getElementById("faultInput"+index);
+  const reason = input.value.trim();
+
+  if(!reason){
+    alert("Enter a reason!");
+    return;
+  }
+
+  const url = faultURL + "?row=" + (index+2) + "&message=" + encodeURIComponent(reason);
+
+  try{
+
+    await fetch(url, {method:"POST", mode:"no-cors"});
+
+    setTimeout(fetchFaults,500);
+
+  }catch(err){
+
+    console.log("Error saving fault reason", err);
+   
+  }
+
 }
 
 // ---------------- REFRESH ----------------
@@ -223,20 +300,24 @@ async function refreshDashboard(){
   msg.style.color="#c62828";
   await fetchFirebase();
   await fetchSheet();
+  await fetchFaults();
   msg.textContent="Refresh complete";
   msg.style.color="#2ecc71";
   setTimeout(()=>{msg.textContent="";},2000);
 }
 
 refreshDashboard();
-setInterval(refreshDashboard,30000);
-
+setInterval(refreshDashboard,40000);
 </script>
 
 <div class="footer">
 <b>Developed by: Shanta Saha</b><br>
 AGM (O&amp;M)<br>
 Naogaon PBS-1
+</div>
+
+</body>
+</html>
 </div>
 
 </body>
