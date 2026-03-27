@@ -107,6 +107,8 @@ relays.forEach((r,i)=>{
 
     <div class="last" id="area${i}" style="display:none;padding:4px;border:1px solid #2d9cff;border-radius:6px;background:#f0f8ff;"></div>
 
+   <div class="last" id="faultCard${i}" style="display:none;padding:4px;border:1px solid #2d9cff;border-radius:6px;background:#f0f8ff;"></div>
+
   </div>`;
 });
 
@@ -214,6 +216,96 @@ function resetArea(index){
   }
 }
 
+// ---------------- FAULT CARD ----------------
+const faultURL = "https://script.google.com/macros/s/AKfycbyfzHWQD-9qPg7cl7-DqF4U3SrETRy1NYAyiE8UypqIiLVB1gSrRy1CJhafhNxYrezt/exec"; // replace with your Web App URL
+
+async function fetchFaults() {
+
+  try {
+
+    const res = await axios.get(faultURL);
+    const messages = res.data;
+
+    for (let i = 0; i < relays.length; i++) {
+
+      const st = document.getElementById("status"+i).textContent.split(": ")[1];
+      const faultCard = document.getElementById("faultCard"+i);
+
+      if (st === "ON") {
+
+        faultCard.style.display = "none";
+
+        // CLEAR FAULT FROM GOOGLE SHEET
+        const clearURL = faultURL + "?row=" + (i+2) + "&message=";
+        fetch(clearURL, {method:"POST", mode:"no-cors"});
+
+      }
+
+      else if (st === "OFF") {
+
+        const msg = messages[i] || "";
+
+        if(msg){
+
+          faultCard.innerHTML = "<b>Reason:</b> " + msg;
+
+        }else{
+
+          faultCard.innerHTML = `
+            <input type="text" id="faultInput${i}" placeholder="Enter Fault Reason">
+             <button type="button" onclick="saveFault(${i})">Save</button>
+          `;
+
+        }
+
+        faultCard.style.display = "block";
+
+      }
+
+      else {
+
+        faultCard.style.display = "none";
+
+      }
+
+    }
+
+  }
+
+  catch(err){
+
+    console.log("Fetch faults error", err);
+     alert("Error saving fault reason");
+
+  }
+
+}
+// ---------------- SAVE FAULT ----------------
+async function saveFault(index){
+
+  const input = document.getElementById("faultInput"+index);
+  const reason = input.value.trim();
+
+  if(!reason){
+    alert("Enter a reason!");
+    return;
+  }
+
+  const url = faultURL + "?row=" + (index+2) + "&message=" + encodeURIComponent(reason);
+
+  try{
+
+    await fetch(url, {method:"POST", mode:"no-cors"});
+
+    setTimeout(fetchFaults,500);
+
+  }catch(err){
+
+    console.log("Error saving fault reason", err);
+   
+  }
+
+}
 // ---------------- REFRESH ----------------
 async function refreshDashboard(){
   const msg=document.getElementById("refreshMsg");
@@ -221,13 +313,14 @@ async function refreshDashboard(){
   msg.style.color="#c62828";
   await fetchFirebase();
   await fetchSheet();
+  await fetchFaults();
   msg.textContent="Refresh complete";
   msg.style.color="#2ecc71";
   setTimeout(()=>{msg.textContent="";},2000);
 }
 
 refreshDashboard();
-setInterval(refreshDashboard,30000);
+setInterval(refreshDashboard,40000);
 
 </script>
 
