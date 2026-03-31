@@ -56,15 +56,19 @@ th{background:#eaf3ff}
     <button onclick="exportExcel('historyTable','NG1_History.xlsx')">⬇ Excel</button>
     <button onclick="exportHistoryPDF()">📄 PDF</button>
   </div>
-  <table id="historyTable">
-    <thead>
-      <tr>
-        <th>Timestamp</th><th>Feeder</th><th>Event</th>
-        <th>Status</th><th>Duration(s)</th><th>Last Status</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<table id="historyTable">
+  <thead>
+    <tr>
+      <th>Timestamp</th>
+      <th>Feeder</th>
+      <th>Event</th>
+      <th>Status</th>
+      <th>Duration(s)</th>
+      <th>Last Status</th>
+      <th>Remarks</th> </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 </div>
 
 <div class="page" id="saifi">
@@ -88,7 +92,7 @@ th{background:#eaf3ff}
 </div>
 
 <script>
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzKByjrXr6ifLA6af6XnKeNvvm4A0NvlTUa7beyDsqdMUsqwsl_1sPVh5o0t-jMbjIEow/exec"; // <--- Replace with your deployed Web App URL
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwM1gZhfvWk9Gqjxfzfa_h6JFh3CEPOP_ObKpSUd9tUEwx0-MbwOREHpRxiigba4859XA/exec"; // <--- Replace with your deployed Web App URL
 let dataCache = { history: [], reliability: [] }, chart;
 
 function showPage(id){
@@ -133,16 +137,17 @@ function initHistory(){
     if (fromDateValue && new Date(row.Timestamp) < new Date(fromDateValue)) return;
     if (toDateValue && new Date(row.Timestamp) > new Date(toDateValue)) return;
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${new Date(row.Timestamp).toLocaleString("en-GB",{hour12:false})}</td>
-      <td>${row.FeederID}</td>
-      <td>${row.Event}</td>
-      <td>${row.Status}</td>
-      <td>${row.DurationSeconds}</td>
-      <td>${row.LastStatus}</td>
-    `;
-    tbody.appendChild(tr);
+  // ... inside function initHistory() ...
+const tr = document.createElement("tr");
+tr.innerHTML = `
+  <td>${new Date(row.Timestamp).toLocaleString("en-GB",{hour12:false})}</td>
+  <td>${row.FeederID}</td>
+  <td>${row.Event}</td>
+  <td>${row.Status}</td>
+  <td>${row.DurationSeconds}</td>
+  <td>${row.LastStatus}</td>
+  <td>${row.Remarks}</td> `;
+tbody.appendChild(tr);
   });
 }
 
@@ -225,6 +230,9 @@ function toggleChartTable(){
 // Load initial page
 showPage('monitor');
 </script>
+
+</body>
+</html>
 
 </body>
 </html>
