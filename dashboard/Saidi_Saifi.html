@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Master SAIDI/SAIFI Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        body { background: #f8f9fa; padding: 10px; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        .substation-card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #0d6efd; }
+        .filter-section { background: #ffffff; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        
+        /* Mobile Card Styling */
+        .mobile-card { border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #fff; }
+        .mobile-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; border-bottom: 1px dashed #f0f0f0; padding-bottom: 2px; }
+        .m-label { font-weight: bold; color: #555; }
+        
+        /* Visibility Toggles */
+        .desktop-only { display: block; }
+        .mobile-only { display: none; }
+
+        @media (max-width: 768px) {
+            body { padding: 5px; }
+            .desktop-only { display: none; }
+            .mobile-only { display: block; }
+            .filter-section .btn { font-size: 0.85rem; padding: 8px; }
+            h2 { font-size: 1.25rem; }
+        }
+
+        @media print { .no-print { display: none !important; } }
+        .val-saifi { color: #0d6efd; font-weight: bold; }
+        .val-saidi { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid">
+    <h2 class="text-center my-3 fw-bold text-primary">Naogaon PBS-1 Substation SAIDI SAIFI Report</h2>
+
+    <!-- Filter & Export Section -->
+    <div class="filter-section no-print">
+        <div class="row g-2">
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-bold">Substation</label>
+                <select id="substationFilter" class="form-select form-select-sm" onchange="applyFilters()">
+                    <option value="all">All</option>
+                    <option value="Naogaon-1 (Sodor)">Naogaon-1 (Sodor)</option>
+                    <option value="Naogaon-2 (Hogolbari)">Naogaon-2 (Hogolbari)</option>
+                    <option value="Naogaon-3 (Dubolhati)">Naogaon-3 (Dubolhati)</option>
+                    <option value="Mohadevpur-2 (Choumashia)">Mohadevpur-2 (Choumashia)</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-bold">Month</label>
+                <select id="monthFilter" class="form-select form-select-sm" onchange="applyFilters()">
+                    <option value="all">All</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-6 d-flex align-items-end gap-2 mt-2 mt-md-0">
+                <button class="btn btn-success btn-sm w-100" onclick="exportToExcel()">Excel</button>
+                <button class="btn btn-danger btn-sm w-100" onclick="exportToPDF()">PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-content">
+        <div class="text-center p-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Syncing data...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SUBSTATION_URLS = [
+        { name: "Naogaon-1 (Sodor)", url: "https://script.google.com/macros/s/AKfycbwM1gZhfvWk9Gqjxfzfa_h6JFh3CEPOP_ObKpSUd9tUEwx0-MbwOREHpRxiigba4859XA/exec?mode=history" },
+        { name: "Naogaon-2 (Hogolbari)", url: "https://script.google.com/macros/s/AKfycbxho6lpOm4Z82rk2u6osxDL-PFThMXbefFphNN8hq4i_aXHsiqu-ej-RXnYD2yQCw2j/exec?mode=history" },
+        { name: "Naogaon-3 (Dubolhati)", url: "https://script.google.com/macros/s/AKfycby_Z0_sID7Dy0nWOG9DNTiWHlhjtnS3n8BPTNAuiI6LXQOTuKEwCfmvmuf0AeKGxWvG/exec?mode=history" },
+        { name: "Mohadevpur-2 (Choumashia)", url: "https://script.google.com/macros/s/AKfycbzXZWtHyhJs_wQkGUEgELIRTHTPiQGNbu1u94iJje4jZKE_CoO4KhOsds0fJF12v_PM/exec?mode=history" }
+    ];
+
+    let MASTER_DATA = [];
+
+    async function loadAllData() {
+        const monthsFound = new Set();
+        try {
+            const results = await Promise.all(SUBSTATION_URLS.map(async sub => {
+                const response = await fetch(sub.url);
+                const result = await response.json();
+                result.reliability.forEach(r => monthsFound.add(r.Month));
+                return { name: sub.name, data: result.reliability };
+            }));
+            MASTER_DATA = results;
+            populateMonthFilter(Array.from(monthsFound).sort().reverse());
+            applyFilters();
+        } catch (error) {
+            document.getElementById('dashboard-content').innerHTML = `<div class="alert alert-danger">Network Error</div>`;
+        }
+    }
+
+    function populateMonthFilter(months) {
+        const select = document.getElementById('monthFilter');
+        months.forEach(m => {
+            let opt = document.createElement('option');
+            opt.value = m; opt.innerHTML = m;
+            select.appendChild(opt);
+        });
+    }
+
+    function applyFilters() {
+        const subVal = document.getElementById('substationFilter').value;
+        const monthVal = document.getElementById('monthFilter').value;
+        const dashboard = document.getElementById('dashboard-content');
+        dashboard.innerHTML = '';
+
+        MASTER_DATA.forEach(sub => {
+            if (subVal !== 'all' && sub.name !== subVal) return;
+            const filtered = sub.data.filter(item => monthVal === 'all' || item.Month === monthVal);
+            if (filtered.length > 0) renderSubstation(sub.name, filtered);
+        });
+    }
+
+    function renderSubstation(name, data) {
+        const dashboard = document.getElementById('dashboard-content');
+        
+        // PC Table Rows
+        let tableRows = data.map(item => `
+            <tr>
+                <td>${item.Month}</td><td>${item.Feeder}</td><td>${item.Customers}</td><td>${item.Interruptions}</td><td>${item.OutageMinutes.toFixed(2)}</td>
+                <td class="val-saifi">${item.SAIFI.toFixed(4)}</td><td class="val-saidi">${item.SAIDI.toFixed(2)}</td>
+            </tr>`).join('');
+
+        // Mobile Card List
+        let mobileList = data.map(item => `
+            <div class="mobile-card">
+                <div class="mobile-row"><span class="m-label">Feeder:</span><strong>${item.Feeder} (${item.Month})</strong></div>
+                <div class="mobile-row"><span class="m-label">Cust / Int:</span><span>${item.Customers} / ${item.Interruptions}</span></div>
+                <div class="mobile-row"><span class="m-label">Outage Mins:</span><span>${item.OutageMinutes.toFixed(1)}</span></div>
+                <div class="mobile-row"><span class="m-label">SAIFI:</span><span class="val-saifi">${item.SAIFI.toFixed(4)}</span></div>
+                <div class="mobile-row"><span class="m-label">SAIDI:</span><span class="val-saidi">${item.SAIDI.toFixed(2)}</span></div>
+            </div>`).join('');
+
+        dashboard.innerHTML += `
+            <div class="substation-card">
+                <h5 class="fw-bold mb-3">${name}</h5>
+                <div class="desktop-only table-responsive">
+                    <table class="table table-hover table-sm substation-table" data-subname="${name}">
+                        <thead class="table-dark"><tr><th>Month</th><th>Feeder</th><th>Cust</th><th>Int.</th><th>Mins</th><th>SAIFI</th><th>SAIDI</th></tr></thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                </div>
+                <div class="mobile-only">${mobileList}</div>
+            </div>`;
+    }
+
+    function exportToExcel() {
+        const wb = XLSX.utils.book_new();
+        document.querySelectorAll(".substation-table").forEach(table => {
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.table_to_sheet(table), table.getAttribute('data-subname').substring(0, 31));
+        });
+        XLSX.writeFile(wb, "Reliability_Report.xlsx");
+    }
+
+    function exportToPDF() {
+        const opt = { margin: 0.3, filename: 'Reliability_Report.pdf', html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+        html2pdf().set(opt).from(document.getElementById('dashboard-content')).save();
+    }
+
+    loadAllData();
+</script>
+</body>
+</html>
