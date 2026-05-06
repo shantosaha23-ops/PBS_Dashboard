@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Naogaon PBS-1 Substation Monitor</title>
+
+<style>
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --primary:#2d9cff;
+  --danger:#c62828;
+}
+body{
+  margin:12px;
+  font-family:system-ui,Roboto;
+  background:var(--bg);
+  color:#111;
+}
+h1{text-align:center;font-size:20px;margin:8px 0 14px;}
+#controls{display:flex;gap:10px;justify-content:center;align-items:center;margin-bottom:6px;}
+button{padding:10px 14px;border:0;border-radius:8px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer;}
+#onlineStatus{padding:6px 10px;border-radius:6px;font-weight:bold;color:#fff;background:#888;}
+#refreshMsg{text-align:center;font-size:12px;font-weight:700;min-height:16px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;}
+.card{
+  background:var(--card);
+  padding:12px;
+  border-radius:12px;
+  box-shadow:0 2px 6px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+.label{font-weight:700;margin:0;}
+.row{display:flex;align-items:center;}
+.led{width:14px;height:14px;border-radius:50%;margin-right:8px;background:#bbb;}
+.led.on{background:#2ecc71;}
+.led.off{background:#e74c3c;}
+.led.blink{animation: blink 1s infinite;}
+@keyframes blink{
+  0%,50%,100%{opacity:1;}
+  25%,75%{opacity:0;}
+}
+.statusText{font-weight:700;margin-top:6px;}
+.trip{font-size:12px;color:var(--danger);margin-top:4px;font-weight:700;}
+.last{font-size:12px;margin-top:2px;word-wrap:break-word;white-space:normal;max-height:80px;overflow-y:auto;}
+.footer{text-align:center;margin-top:30px;font-size:13px;color:#333;}
+</style>
+</head>
+
+<body>
+
+<h1>Naogaon 2(Hogolbari) Substation Feeder Status</h1>
+
+<div id="controls">
+  <button onclick="refreshDashboard()">🔄 Refresh</button>
+  <div id="onlineStatus">Connecting...</div>
+</div>
+
+<div id="refreshMsg"></div>
+
+<div class="grid" id="grid"></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<script>
+
+ 
+
+
+// ---------------- FEEDERS ----------------
+const relays=[
+  {id:'relay1',name:'NG2 1A'},
+  {id:'relay2',name:'NG2 2B'},
+  {id:'relay3',name:'NG2 3C'},
+  {id:'relay4',name:'NG2 4D'},
+  {id:'relay5',name:'NG2 5E'},
+  
+];
+
+// ---------------- BUILD UI ----------------
+const grid=document.getElementById("grid");
+relays.forEach((r,i)=>{
+  grid.innerHTML+=`
+  <div class="card" onclick="toggleArea(${i})">
+
+    <div class="row" style="align-items:center; margin-bottom:6px;">
+      <div class="led" id="led${i}" style="margin-right:8px;"></div>
+      <div class="label">${r.name}</div>
+    </div>
+
+    <div class="statusText" id="status${i}">Status: --</div>
+
+    <div id="tripBox${i}">
+      <div class="trip">This Month Trips: <span id="cur${i}">0</span></div>
+      <div class="trip">Last Month Trips: <span id="pre${i}">0</span></div>
+      <div class="last" id="lastTrip${i}">Last Trip: --</div>
+      <div class="last" id="lastOn${i}">Last ON: --</div>
+    </div>
+
+    <div class="last" id="area${i}" style="display:none;padding:4px;border:1px solid #2d9cff;border-radius:6px;background:#f0f8ff;"></div>
+
+   <div class="last" id="faultCard${i}" style="display:none;padding:4px;border:1px solid #2d9cff;border-radius:6px;background:#f0f8ff;"></div>
+
+  </div>`;
+});
+
+// ---------------- TIME FORMAT ----------------
+function fmt(t){
+  if(!t||t==="--")return"--";
+  if(t.includes("T")){
+    return new Date(t).toLocaleString("en-GB",{timeZone:"Asia/Dhaka",hour12:false});
+  }
+  const p=t.split(" ");
+  const d=p[0].split("-");
+  return `${d[2]}-${d[1]}-${d[0]} ${p[1]}`;
+}
+
+// ---------------- FIREBASE STATUS ----------------
+async function fetchFirebase(){
+
+  let offline=false;
+  const now=Math.floor(Date.now()/1000);
+  const data=[];
+
+  for(let i=0;i<relays.length;i++){
+
+    try{
+
+      const res = await axios.get(
+        "https://hogolbari-15117-default-rtdb.asia-southeast1.firebasedatabase.app/"+relays[i].id+".json"
+      );
+
+      const d = res.data || {};
+      data.push(d);
+
+      if(now-(d.lastUpdateEpoch||0)>120){
+        offline=true;
+      }
+
+    }catch(err){
+      console.log("Firebase REST error", err);
+      data.push({});
+      offline=true;
+    }
+  }
+
+  for(let i=0;i<relays.length;i++){
+
+    const st = offline ? "--" : (data[i].status || "--");
+
+    document.getElementById("status"+i).textContent="Status: "+st;
+
+    const led = document.getElementById("led"+i);
+    led.className = "led "+(
+      st==="ON" ? "on" :
+      st==="OFF" ? "off blink" : ""
+    );
+  }
+
+  const os=document.getElementById("onlineStatus");
+  os.textContent=offline?"Offline":"Online";
+  os.style.background=offline?"#e74c3c":"#2ecc71";
+}
+
+// ---------------- MAIN SHEET ----------------
+const sheetURL="https://script.google.com/macros/s/AKfycbypQx-W2_nPf-gkB7tPy_m_PQJyCdgU-bZ2X8ychsspBTW39PEhUBh2IRTVjQRNZPKm/exec?mode=trip";
+
+// ---------------- FEEDER AREA SHEET ----------------
+const feederAreaURL="https://script.google.com/macros/s/AKfycbypQx-W2_nPf-gkB7tPy_m_PQJyCdgU-bZ2X8ychsspBTW39PEhUBh2IRTVjQRNZPKm/exec?mode=area";
+
+// ---------------- LOAD TRIP DATA ----------------
+async function fetchSheet(){
+  const r=await axios.get(sheetURL);
+  r.data.forEach((row,i)=>{
+    document.getElementById("cur"+i).textContent=row.thisMonthTrips||0;
+    document.getElementById("pre"+i).textContent=row.lastMonthTrips||0;
+    document.getElementById("lastTrip"+i).textContent="Last Trip: "+fmt(row.lastTripTime);
+    document.getElementById("lastOn"+i).textContent="Last ON: "+fmt(row.lastOnTime);
+  });
+}
+
+// ---------------- TOGGLE AREA ----------------
+let activeCards = {};
+let areaTimers = {};
+
+async function toggleArea(index){
+  const isOpen = activeCards[index];
+
+  if(isOpen){ resetArea(index); return; }
+
+  activeCards[index] = true;
+
+  try{
+    const r = await axios.get(feederAreaURL);
+    const row = r.data[index];
+
+    // Hide trips
+    document.getElementById("tripBox"+index).style.display="none";
+
+    // Show area
+    const area = document.getElementById("area"+index);
+    area.style.display = "block";
+    area.innerHTML = "<b>Area:</b> "+(row.area || "--");
+
+    // Clear previous timer if any
+    if(areaTimers[index]) clearTimeout(areaTimers[index]);
+
+    // Auto reset after 15s
+    areaTimers[index] = setTimeout(()=>{ resetArea(index); },15000);
+
+  }catch(err){
+    console.log("Area load error", err);
+  }
+}
+
+function resetArea(index){
+  document.getElementById("tripBox"+index).style.display="block";
+
+  const area=document.getElementById("area"+index);
+  area.style.display="none";
+  area.innerHTML="";
+
+  activeCards[index] = false;
+
+  if(areaTimers[index]){
+    clearTimeout(areaTimers[index]);
+    areaTimers[index] = null;
+  }
+}
+
+// ---------------- FAULT CARD ----------------
+const faultURL = "https://script.google.com/macros/s/AKfycbyfzHWQD-9qPg7cl7-DqF4U3SrETRy1NYAyiE8UypqIiLVB1gSrRy1CJhafhNxYrezt/exec"; // replace with your Web App URL
+
+async function fetchFaults() {
+
+  try {
+
+    const res = await axios.get(faultURL);
+    const messages = res.data;
+
+    for (let i = 0; i < relays.length; i++) {
+
+      const st = document.getElementById("status"+i).textContent.split(": ")[1];
+      const faultCard = document.getElementById("faultCard"+i);
+
+      if (st === "ON") {
+
+        faultCard.style.display = "none";
+
+        // CLEAR FAULT FROM GOOGLE SHEET
+        const clearURL = faultURL + "?row=" + (i+2) + "&message=";
+        fetch(clearURL, {method:"POST", mode:"no-cors"});
+
+      }
+
+      else if (st === "OFF") {
+
+        const msg = messages[i] || "";
+
+        if(msg){
+
+          faultCard.innerHTML = "<b>Reason:</b> " + msg;
+
+        }else{
+
+          faultCard.innerHTML = `
+            <input type="text" id="faultInput${i}" placeholder="Enter Fault Reason">
+             <button type="button" onclick="saveFault(${i})">Save</button>
+          `;
+
+        }
+
+        faultCard.style.display = "block";
+
+      }
+
+      else {
+
+        faultCard.style.display = "none";
+
+      }
+
+    }
+
+  }
+
+  catch(err){
+
+    console.log("Fetch faults error", err);
+     alert("Error saving fault reason");
+
+  }
+
+}
+// ---------------- SAVE FAULT ----------------
+async function saveFault(index){
+
+  const input = document.getElementById("faultInput"+index);
+  const reason = input.value.trim();
+
+  if(!reason){
+    alert("Enter a reason!");
+    return;
+  }
+
+  const url = faultURL + "?row=" + (index+2) + "&message=" + encodeURIComponent(reason);
+
+  try{
+
+    await fetch(url, {method:"POST", mode:"no-cors"});
+
+    setTimeout(fetchFaults,500);
+
+  }catch(err){
+
+    console.log("Error saving fault reason", err);
+   
+  }
+
+}
+// ---------------- REFRESH ----------------
+async function refreshDashboard(){
+  const msg=document.getElementById("refreshMsg");
+  msg.textContent="Refreshing...";
+  msg.style.color="#c62828";
+  await fetchFirebase();
+  await fetchSheet();
+  await fetchFaults();
+  msg.textContent="Refresh complete";
+  msg.style.color="#2ecc71";
+  setTimeout(()=>{msg.textContent="";},2000);
+}
+
+refreshDashboard();
+setInterval(refreshDashboard,40000);
+
+</script>
+
+<div class="footer">
+<b>Developed by: Shanta Saha</b><br>
+AGM (O&amp;M)<br>
+Naogaon PBS-1
+</div>
+
+</body>
+
+</html>
