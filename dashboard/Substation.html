@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!DOC<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Naogaon PBS-1 Central Feeder Monitor v4</title>
+<title>Naogaon PBS-1 Central Feeder Monitor</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -168,7 +168,8 @@ select {
 </div>
 
 <script>
-const OFFLINE_TIMEOUT = 120000;
+// Heartbeat window threshold set to 65 seconds
+const OFFLINE_TIMEOUT = 65000;
 
 const substations = [
     { id: "NG1(Sodor)", segment: "HQ", url: "https://naogaon-ss-default-rtdb.asia-southeast1.firebasedatabase.app/" },
@@ -209,9 +210,26 @@ function updateUI() {
         }
 
         const isOnline = (now - data.lastUpdate) < OFFLINE_TIMEOUT;
+        
+        let onDisplay = "---";
+        let offDisplay = "---";
+        let vDisplay = "---";
+        let iDisplay = "---";
+        let pDisplay = "---";
+        let fDisplay = "---";
+        let pfDisplay = "---";
+
         if (isOnline) {
             globalOn += data.on;
             globalOff += data.off;
+            
+            onDisplay = `${data.on} ON`;
+            offDisplay = `${data.off} OFF`;
+            vDisplay = `${data.power.voltage}kV`;
+            iDisplay = `${data.power.current}A`;
+            pDisplay = `${data.power.power}MW`;
+            fDisplay = `${data.power.frequency}Hz`;
+            pfDisplay = data.power.pf || '0.00';
         }
 
         container.innerHTML += `
@@ -219,20 +237,20 @@ function updateUI() {
                 <div class="sub-header">
                     <span class="sub-name">${sub.id}</span>
                     <span style="font-weight:bold">
-                        <span class="pulse-online">${data.on} ON</span> / 
-                        <span class="pulse-offline">${data.off} OFF</span>
+                        <span class="${isOnline ? 'pulse-online' : ''}">${onDisplay}</span> / 
+                        <span class="${isOnline ? 'pulse-offline' : ''}">${offDisplay}</span>
                     </span>
                 </div>
                 <div class="power-info">
-                    <span><b>V:</b> ${data.power.voltage}kV</span>
-                    <span><b>I:</b> ${data.power.current}A</span>
-                    <span><b>P:</b> ${data.power.power}MW</span>
-                    <span><b>F:</b> ${data.power.frequency}Hz</span>
-                    <span style="color: var(--accent)"><b>PF:</b> ${data.power.pf || '0.00'}</span>
+                    <span><b>V:</b> ${vDisplay}</span>
+                    <span><b>I:</b> ${iDisplay}</span>
+                    <span><b>P:</b> ${pDisplay}</span>
+                    <span><b>F:</b> ${fDisplay}</span>
+                    <span style="color: ${isOnline ? 'var(--accent)' : 'inherit'}"><b>PF:</b> ${pfDisplay}</span>
                 </div>
                 <div class="meta-info">
                     <span class="${isOnline ? 'pulse-online' : 'pulse-offline'}">● ${isOnline ? 'ONLINE' : 'OFFLINE'}</span>
-                    <span>Updated: ${new Date(data.lastUpdate).toLocaleTimeString()}</span>
+                    <span>${isOnline ? 'Updated: ' + new Date(data.lastUpdate).toLocaleTimeString() : 'Heartbeat Lost'}</span>
                 </div>
             </div>`;
     });
@@ -272,6 +290,9 @@ document.getElementById("segmentSelect").addEventListener("change", e => {
     selectedSegment = e.target.value;
     updateUI();
 });
+
+// Periodic check execution loop to handle status transitions smoothly
+setInterval(updateUI, 5000);
 </script>
 </body>
 </html>
