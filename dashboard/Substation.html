@@ -1,10 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Naogaon PBS-1 Central Feeder Monitor</title>
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>
+Naogaon PBS-1 Central Feeder Monitor
+</title>
 
 <style>
 
@@ -113,7 +119,6 @@ select{
     padding:16px;
     background:#fff;
     border:1px solid #e5e7eb;
-    transition:0.2s;
 }
 
 .sub-header{
@@ -166,6 +171,7 @@ select{
 }
 
 </style>
+
 </head>
 
 <body>
@@ -173,19 +179,35 @@ select{
 <div class="monitor-card">
 
 <header>
-<h1>Naogaon PBS-1 Central Feeder Monitor</h1>
+
+<h1>
+Naogaon PBS-1 Central Feeder Monitor
+</h1>
+
 </header>
 
 <div class="summary-grid">
 
 <div class="stat-item">
-<span class="stat-value pulse-online" id="totalOn">0</span>
-<span class="stat-label">FEEDERS ON</span>
+
+<span class="stat-value pulse-online"
+id="totalOn">0</span>
+
+<span class="stat-label">
+FEEDERS ON
+</span>
+
 </div>
 
 <div class="stat-item">
-<span class="stat-value pulse-offline" id="totalOff">0</span>
-<span class="stat-label">FEEDERS OFF</span>
+
+<span class="stat-value pulse-offline"
+id="totalOff">0</span>
+
+<span class="stat-label">
+FEEDERS OFF
+</span>
+
 </div>
 
 </div>
@@ -194,26 +216,52 @@ select{
 
 <select id="segmentSelect">
 
-<option value="ALL">ALL SUBSTATIONS</option>
-<option value="HQ">HQ</option>
-<option value="Badalgachi">Badalgachi</option>
-<option value="Raninagor">Raninagor</option>
-<option value="Atrai">Atrai</option>
-<option value="Manda">Manda</option>
-<option value="Sotihat">Sotihat</option>
-<option value="Niamatpur">Niamatpur</option>
+<option value="ALL">
+ALL SUBSTATIONS
+</option>
+
+<option value="HQ">
+HQ
+</option>
+
+<option value="Badalgachi">
+Badalgachi
+</option>
+
+<option value="Raninagor">
+Raninagor
+</option>
+
+<option value="Atrai">
+Atrai
+</option>
+
+<option value="Manda">
+Manda
+</option>
+
+<option value="Sotihat">
+Sotihat
+</option>
+
+<option value="Niamatpur">
+Niamatpur
+</option>
 
 </select>
 
 </div>
 
-<div id="substationContainer" class="sub-list"></div>
+<div id="substationContainer"
+class="sub-list">
+
+</div>
 
 </div>
 
 <script>
 
-const OFFLINE_TIMEOUT = 60000;
+const OFFLINE_TIMEOUT = 60;
 
 const substations = [
 
@@ -251,9 +299,11 @@ async function loadFirebaseData(sub){
 
     try{
 
-        const response = await fetch(sub.url);
+        const response =
+        await fetch(sub.url);
 
-        const root = await response.json();
+        const root =
+        await response.json();
 
         if(!root){
             return;
@@ -261,6 +311,8 @@ async function loadFirebaseData(sub){
 
         let on = 0;
         let off = 0;
+
+        let latestEpoch = 0;
 
         Object.keys(root).forEach(key => {
 
@@ -278,6 +330,18 @@ async function loadFirebaseData(sub){
                 }
                 else if(status === "OFF"){
                     off++;
+                }
+
+                // FIND LATEST HEARTBEAT
+                if(
+                    root[key].lastUpdateEpoch
+                    &&
+                    root[key].lastUpdateEpoch
+                    > latestEpoch
+                ){
+
+                    latestEpoch =
+                    root[key].lastUpdateEpoch;
                 }
             }
         });
@@ -297,7 +361,8 @@ async function loadFirebaseData(sub){
                 pf:0
             },
 
-            lastUpdate:Date.now()
+            lastUpdateEpoch:
+            latestEpoch
         };
 
     }
@@ -326,7 +391,8 @@ function updateUI(){
     let globalOn = 0;
     let globalOff = 0;
 
-    const now = Date.now();
+    const currentEpoch =
+    Math.floor(Date.now()/1000);
 
     const container =
     document.getElementById(
@@ -345,12 +411,17 @@ function updateUI(){
             return;
         }
 
-        const data = liveData[sub.id];
+        const data =
+        liveData[sub.id];
 
         const isOnline =
         (
             data &&
-            (now - data.lastUpdate)
+            (
+                currentEpoch
+                -
+                data.lastUpdateEpoch
+            )
             <=
             OFFLINE_TIMEOUT
         );
@@ -364,6 +435,9 @@ function updateUI(){
         let frequencyDisplay = "---";
         let pfDisplay = "---";
 
+        let updatedTime =
+        "Heartbeat Lost";
+
         if(isOnline){
 
             globalOn += data.on;
@@ -376,19 +450,29 @@ function updateUI(){
             data.off + " OFF";
 
             voltageDisplay =
-            data.power.voltage + " kV";
+            data.power.voltage
+            + " kV";
 
             currentDisplay =
-            data.power.current + " A";
+            data.power.current
+            + " A";
 
             powerDisplay =
-            data.power.power + " MW";
+            data.power.power
+            + " MW";
 
             frequencyDisplay =
-            data.power.frequency + " Hz";
+            data.power.frequency
+            + " Hz";
 
             pfDisplay =
             data.power.pf;
+
+            updatedTime =
+            new Date(
+                data.lastUpdateEpoch
+                * 1000
+            ).toLocaleTimeString();
         }
 
         container.innerHTML += `
@@ -413,7 +497,9 @@ function updateUI(){
                     :
                     'pulse-offline'}
                     ">
+
                     ${onDisplay}
+
                     </span>
 
                     /
@@ -424,7 +510,9 @@ function updateUI(){
                     :
                     'pulse-offline'}
                     ">
+
                     ${offDisplay}
+
                     </span>
 
                 </span>
@@ -481,10 +569,8 @@ function updateUI(){
 
                 ${isOnline ?
 
-                'Updated: ' +
-                new Date(
-                    data.lastUpdate
-                ).toLocaleTimeString()
+                'Updated: '
+                + updatedTime
 
                 :
 
@@ -500,11 +586,13 @@ function updateUI(){
 
     document.getElementById(
         "totalOn"
-    ).innerText = globalOn;
+    ).innerText =
+    globalOn;
 
     document.getElementById(
         "totalOff"
-    ).innerText = globalOff;
+    ).innerText =
+    globalOff;
 }
 
 document.getElementById(
@@ -513,16 +601,25 @@ document.getElementById(
 "change",
 function(e){
 
-    selectedSegment = e.target.value;
+    selectedSegment =
+    e.target.value;
 
     updateUI();
 });
 
 refreshAll();
 
-setInterval(refreshAll, 5000);
+// FETCH FIREBASE EVERY 5 SEC
+setInterval(
+refreshAll,
+5000
+);
 
-setInterval(updateUI, 1000);
+// CHECK OFFLINE EVERY 1 SEC
+setInterval(
+updateUI,
+1000
+);
 
 </script>
 
