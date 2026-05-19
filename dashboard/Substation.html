@@ -1,298 +1,627 @@
-<!DOC<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
 <title>Naogaon PBS-1 Central Feeder Monitor</title>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <style>
+
 :root{
-    --bg: #f0f4f8;
-    --card: #ffffff;
-    --green: #10b981;
-    --red: #ef4444;
-    --gray: #6b7280;
-    --text: #111827;
-    --accent: #2563eb;
+    --bg:#f3f4f6;
+    --card:#ffffff;
+    --green:#10b981;
+    --red:#ef4444;
+    --gray:#6b7280;
+    --text:#111827;
+    --accent:#2563eb;
 }
 
-*{ box-sizing: border-box; }
+*{
+    box-sizing:border-box;
+}
 
 body{
-    margin: 0;
-    padding: 20px;
-    min-height: 100vh;
-    background: #f3f4f6;
-    font-family: 'Inter', -apple-system, sans-serif;
-    color: var(--text);
+    margin:0;
+    padding:20px;
+    min-height:100vh;
+    background:var(--bg);
+    font-family:Arial, sans-serif;
+    color:var(--text);
 }
 
 .monitor-card{
-    width: 100%;
-    max-width: 800px;
-    margin: 0 auto;
-    background: var(--card);
-    border-radius: 16px;
-    padding: 30px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    width:100%;
+    max-width:900px;
+    margin:auto;
+    background:var(--card);
+    border-radius:16px;
+    padding:25px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.08);
 }
 
-header {
-    text-align: center;
-    margin-bottom: 30px;
-    border-bottom: 2px solid #f3f4f6;
-    padding-bottom: 20px;
+header{
+    text-align:center;
+    margin-bottom:25px;
+    border-bottom:2px solid #e5e7eb;
+    padding-bottom:15px;
 }
 
 h1{
-    margin: 0;
-    font-size: 1.5rem;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    margin:0;
+    font-size:1.5rem;
+    color:var(--accent);
 }
 
-.summary-grid {
-    display: flex;
-    justify-content: space-around;
-    background: #f9fafb;
-    padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 25px;
+.summary-grid{
+    display:flex;
+    justify-content:space-around;
+    gap:20px;
+    background:#f9fafb;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
 }
 
-.stat-item { text-align: center; }
-.stat-value { font-size: 2.5rem; font-weight: 800; display: block; }
-.stat-label { font-size: 0.875rem; color: var(--gray); font-weight: 600; }
-
-.controls {
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: center;
+.stat-item{
+    text-align:center;
 }
 
-select {
-    width: 100%;
-    max-width: 300px;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #d1d5db;
-    font-size: 1rem;
+.stat-value{
+    display:block;
+    font-size:2.3rem;
+    font-weight:bold;
 }
 
-.sub-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.stat-label{
+    font-size:0.9rem;
+    color:var(--gray);
+    font-weight:bold;
 }
 
-.sub-card {
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 16px;
-    transition: transform 0.2s;
+.pulse-online{
+    color:var(--green);
 }
 
-.sub-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
+.pulse-offline{
+    color:var(--red);
 }
 
-.sub-name { font-weight: 700; font-size: 1.1rem; }
-
-.pulse-online { color: var(--green); }
-.pulse-offline { color: var(--red); }
-
-.power-info {
-    font-size: 0.85rem;
-    background: #f1f5f9;
-    padding: 10px;
-    border-radius: 6px;
-    margin-bottom: 10px;
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
+.controls{
+    margin-bottom:20px;
+    text-align:center;
 }
 
-.meta-info {
-    font-size: 0.8rem;
-    color: var(--gray);
-    display: flex;
-    justify-content: space-between;
+select{
+    width:100%;
+    max-width:300px;
+    padding:12px;
+    border-radius:8px;
+    border:1px solid #d1d5db;
+    font-size:1rem;
 }
 
-@media(max-width: 600px){
-    .stat-value { font-size: 1.8rem; }
-    .power-info { grid-template-columns: 1fr 1fr; }
+.sub-list{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
 }
+
+.sub-card{
+    border-radius:12px;
+    padding:16px;
+    background:#fff;
+    border:1px solid #e5e7eb;
+}
+
+.sub-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+    gap:10px;
+}
+
+.sub-name{
+    font-weight:bold;
+    font-size:1.05rem;
+}
+
+.power-info{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    background:#f1f5f9;
+    padding:10px;
+    border-radius:8px;
+    margin-bottom:10px;
+    font-size:0.9rem;
+}
+
+.meta-info{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.8rem;
+    color:var(--gray);
+    flex-wrap:wrap;
+    gap:10px;
+}
+
+.loading{
+    text-align:center;
+    padding:20px;
+    color:var(--gray);
+    font-style:italic;
+}
+
+@media(max-width:600px){
+
+    .power-info{
+        grid-template-columns:repeat(2,1fr);
+    }
+
+    .stat-value{
+        font-size:1.8rem;
+    }
+
+    h1{
+        font-size:1.2rem;
+    }
+}
+
 </style>
 </head>
 
 <body>
 
 <div class="monitor-card">
-    <header>
-        <h1>Naogaon PBS-1 Central Feeder Monitor</h1>
-    </header>
 
-    <div class="summary-grid">
-        <div class="stat-item">
-            <span class="stat-value pulse-online" id="totalOn">0</span>
-            <span class="stat-label">FEEDERS ON</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-value pulse-offline" id="totalOff">0</span>
-            <span class="stat-label">FEEDERS OFF</span>
-        </div>
+<header>
+    <h1>Naogaon PBS-1 Central Feeder Monitor</h1>
+</header>
+
+<div class="summary-grid">
+
+    <div class="stat-item">
+        <span class="stat-value pulse-online"
+        id="totalOn">0</span>
+
+        <span class="stat-label">
+        FEEDERS ON
+        </span>
     </div>
 
-    <div class="controls">
-        <select id="segmentSelect">
-            <option value="ALL">ALL SUBSTATIONS</option>
-            <option value="HQ">HQ</option>
-            <option value="Badalgachi">Badalgachi</option>
-            <option value="Raninagor">Raninagor</option>
-            <option value="Atrai">Atrai</option>
-            <option value="Manda">Manda</option>
-            <option value="Sotihat">Sotihat</option>
-            <option value="Niamatpur">Niamatpur</option>
-        </select>
+    <div class="stat-item">
+        <span class="stat-value pulse-offline"
+        id="totalOff">0</span>
+
+        <span class="stat-label">
+        FEEDERS OFF
+        </span>
     </div>
 
-    <div id="substationContainer" class="sub-list"></div>
+</div>
+
+<div class="controls">
+
+<select id="segmentSelect">
+
+<option value="ALL">
+ALL SUBSTATIONS
+</option>
+
+<option value="HQ">
+HQ
+</option>
+
+<option value="Badalgachi">
+Badalgachi
+</option>
+
+<option value="Raninagor">
+Raninagor
+</option>
+
+<option value="Atrai">
+Atrai
+</option>
+
+<option value="Manda">
+Manda
+</option>
+
+<option value="Sotihat">
+Sotihat
+</option>
+
+<option value="Niamatpur">
+Niamatpur
+</option>
+
+</select>
+
+</div>
+
+<div id="substationContainer"
+class="sub-list">
+
+<div class="loading">
+Loading Firebase Data...
+</div>
+
+</div>
+
 </div>
 
 <script>
-// Heartbeat window threshold set to 65 seconds
+
 const OFFLINE_TIMEOUT = 65000;
 
 const substations = [
-    { id: "NG1(Sodor)", segment: "HQ", url: "https://naogaon-ss-default-rtdb.asia-southeast1.firebasedatabase.app/" },
-    { id: "NG2(Hogolbari)", segment: "HQ", url: "https://hogolbari-15117-default-rtdb.asia-southeast1.firebasedatabase.app/" },
-    { id: "NG3(Dubolhati)", segment: "HQ", url: "https://dubolhati-fb64f-default-rtdb.asia-southeast1.firebasedatabase.app/" },
-    { id: "MO2(Choumashia)", segment: "HQ", url: "https://choumashia-48c65-default-rtdb.asia-southeast1.firebasedatabase.app/" },
-    { id: "BAD1(Bodolgachi)", segment: "Badalgachi", url: "" },
-    { id: "RA1(Raninagor)", segment: "Raninagor", url: "" },
-    { id: "RA2(Abadpukur)", segment: "Raninagor", url: "" },
-    { id: "AT1(Atrai-Outdoor)", segment: "Atrai", url: "" },
-    { id: "AT2(Atrai-Indoor)", segment: "Atrai", url: "" },
-    { id: "AT3(Bandaikhara)", segment: "Atrai", url: "" },
-    { id: "MAN1(Mandra)", segment: "Manda", url: "" },
-    { id: "MAN2(Deluabari)", segment: "Manda", url: "" },
-    { id: "MAN3(Sotihat)", segment: "Sotihat", url: "" },
-    { id: "NIA1(Niamatpur)", segment: "Niamatpur", url: "" },
-    { id: "NIA2(Sultanpur)", segment: "Niamatpur", url: "" },
-    { id: "NIA3(Kapastia)", segment: "Niamatpur", url: "" }
+
+{
+    id:"NG1(Sodor)",
+    segment:"HQ",
+    url:"https://naogaon-ss-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
+},
+
+{
+    id:"NG2(Hogolbari)",
+    segment:"HQ",
+    url:"https://hogolbari-15117-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
+},
+
+{
+    id:"NG3(Dubolhati)",
+    segment:"HQ",
+    url:"https://dubolhati-fb64f-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
+},
+
+{
+    id:"MO2(Choumashia)",
+    segment:"HQ",
+    url:"https://choumashia-48c65-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
+},
+
+{
+    id:"BAD1(Bodolgachi)",
+    segment:"Badalgachi",
+    url:""
+},
+
+{
+    id:"RA1(Raninagor)",
+    segment:"Raninagor",
+    url:""
+},
+
+{
+    id:"RA2(Abadpukur)",
+    segment:"Raninagor",
+    url:""
+},
+
+{
+    id:"AT1(Atrai-Outdoor)",
+    segment:"Atrai",
+    url:""
+},
+
+{
+    id:"AT2(Atrai-Indoor)",
+    segment:"Atrai",
+    url:""
+},
+
+{
+    id:"AT3(Bandaikhara)",
+    segment:"Atrai",
+    url:""
+},
+
+{
+    id:"MAN1(Mandra)",
+    segment:"Manda",
+    url:""
+},
+
+{
+    id:"MAN2(Deluabari)",
+    segment:"Manda",
+    url:""
+},
+
+{
+    id:"MAN3(Sotihat)",
+    segment:"Sotihat",
+    url:""
+},
+
+{
+    id:"NIA1(Niamatpur)",
+    segment:"Niamatpur",
+    url:""
+},
+
+{
+    id:"NIA2(Sultanpur)",
+    segment:"Niamatpur",
+    url:""
+},
+
+{
+    id:"NIA3(Kapastia)",
+    segment:"Niamatpur",
+    url:""
+}
+
 ];
 
 const liveData = {};
+
 let selectedSegment = "ALL";
 
-function updateUI() {
+async function loadFirebaseData(sub){
+
+    if(!sub.url) return;
+
+    try{
+
+        const response = await fetch(sub.url);
+
+        const root = await response.json();
+
+        if(!root) return;
+
+        let on = 0;
+        let off = 0;
+
+        Object.keys(root).forEach(key => {
+
+            if(
+                key.toLowerCase().startsWith("relay")
+                &&
+                root[key].status
+            ){
+
+                const status =
+                root[key].status.toUpperCase();
+
+                if(status === "ON"){
+                    on++;
+                }
+                else if(status === "OFF"){
+                    off++;
+                }
+            }
+        });
+
+        liveData[sub.id] = {
+
+            on:on,
+
+            off:off,
+
+            power:root.power || {
+
+                voltage:0,
+                current:0,
+                power:0,
+                frequency:0,
+                pf:0
+            },
+
+            lastUpdate:Date.now()
+        };
+
+    }
+    catch(error){
+
+        console.log(
+            "Firebase Error:",
+            sub.id,
+            error
+        );
+    }
+}
+
+async function refreshAll(){
+
+    for(const sub of substations){
+
+        await loadFirebaseData(sub);
+    }
+
+    updateUI();
+}
+
+function updateUI(){
+
     let globalOn = 0;
     let globalOff = 0;
+
     const now = Date.now();
-    const container = document.getElementById("substationContainer");
+
+    const container =
+    document.getElementById(
+        "substationContainer"
+    );
+
     container.innerHTML = "";
 
     substations.forEach(sub => {
-        if (selectedSegment !== "ALL" && sub.segment !== selectedSegment) return;
-        
-        const data = liveData[sub.id];
-        if (!data) {
-            container.innerHTML += `<div class="sub-card" style="color: #6b7280; font-style: italic;">Connecting to ${sub.id}...</div>`;
+
+        if(
+            selectedSegment !== "ALL"
+            &&
+            sub.segment !== selectedSegment
+        ){
             return;
         }
 
-        const isOnline = (now - data.lastUpdate) < OFFLINE_TIMEOUT;
-        
-        let onDisplay = "---";
-        let offDisplay = "---";
-        let vDisplay = "---";
-        let iDisplay = "---";
-        let pDisplay = "---";
-        let fDisplay = "---";
-        let pfDisplay = "---";
+        const data = liveData[sub.id];
 
-        if (isOnline) {
+        if(!data){
+
+            container.innerHTML += `
+
+            <div class="sub-card">
+
+                <div class="sub-header">
+
+                    <span class="sub-name">
+                    ${sub.id}
+                    </span>
+
+                    <span class="pulse-offline">
+                    NO DATA
+                    </span>
+
+                </div>
+
+            </div>
+            `;
+
+            return;
+        }
+
+        const isOnline =
+        (now - data.lastUpdate)
+        <
+        OFFLINE_TIMEOUT;
+
+        if(isOnline){
+
             globalOn += data.on;
             globalOff += data.off;
-            
-            onDisplay = `${data.on} ON`;
-            offDisplay = `${data.off} OFF`;
-            vDisplay = `${data.power.voltage}kV`;
-            iDisplay = `${data.power.current}A`;
-            pDisplay = `${data.power.power}MW`;
-            fDisplay = `${data.power.frequency}Hz`;
-            pfDisplay = data.power.pf || '0.00';
         }
 
         container.innerHTML += `
-            <div class="sub-card" style="border-left: 5px solid ${isOnline ? '#10b981' : '#ef4444'}">
-                <div class="sub-header">
-                    <span class="sub-name">${sub.id}</span>
-                    <span style="font-weight:bold">
-                        <span class="${isOnline ? 'pulse-online' : ''}">${onDisplay}</span> / 
-                        <span class="${isOnline ? 'pulse-offline' : ''}">${offDisplay}</span>
+
+        <div class="sub-card"
+        style="
+        border-left:5px solid
+        ${isOnline ? '#10b981' : '#ef4444'}
+        ">
+
+            <div class="sub-header">
+
+                <span class="sub-name">
+                ${sub.id}
+                </span>
+
+                <span>
+
+                    <span class="
+                    ${isOnline ?
+                    'pulse-online' : ''}
+                    ">
+                    ${data.on} ON
                     </span>
-                </div>
-                <div class="power-info">
-                    <span><b>V:</b> ${vDisplay}</span>
-                    <span><b>I:</b> ${iDisplay}</span>
-                    <span><b>P:</b> ${pDisplay}</span>
-                    <span><b>F:</b> ${fDisplay}</span>
-                    <span style="color: ${isOnline ? 'var(--accent)' : 'inherit'}"><b>PF:</b> ${pfDisplay}</span>
-                </div>
-                <div class="meta-info">
-                    <span class="${isOnline ? 'pulse-online' : 'pulse-offline'}">● ${isOnline ? 'ONLINE' : 'OFFLINE'}</span>
-                    <span>${isOnline ? 'Updated: ' + new Date(data.lastUpdate).toLocaleTimeString() : 'Heartbeat Lost'}</span>
-                </div>
-            </div>`;
+
+                    /
+
+                    <span class="
+                    ${isOnline ?
+                    'pulse-offline' : ''}
+                    ">
+                    ${data.off} OFF
+                    </span>
+
+                </span>
+
+            </div>
+
+            <div class="power-info">
+
+                <span>
+                <b>V:</b>
+                ${data.power.voltage}
+                </span>
+
+                <span>
+                <b>I:</b>
+                ${data.power.current}
+                </span>
+
+                <span>
+                <b>P:</b>
+                ${data.power.power}
+                </span>
+
+                <span>
+                <b>F:</b>
+                ${data.power.frequency}
+                </span>
+
+                <span>
+                <b>PF:</b>
+                ${data.power.pf}
+                </span>
+
+            </div>
+
+            <div class="meta-info">
+
+                <span class="
+                ${isOnline ?
+                'pulse-online'
+                :
+                'pulse-offline'}
+                ">
+
+                ●
+                ${isOnline ?
+                'ONLINE'
+                :
+                'OFFLINE'}
+
+                </span>
+
+                <span>
+
+                Updated:
+                ${new Date(
+                    data.lastUpdate
+                ).toLocaleTimeString()}
+
+                </span>
+
+            </div>
+
+        </div>
+        `;
     });
 
-    document.getElementById("totalOn").innerText = globalOn;
-    document.getElementById("totalOff").innerText = globalOff;
+    document.getElementById(
+        "totalOn"
+    ).innerText = globalOn;
+
+    document.getElementById(
+        "totalOff"
+    ).innerText = globalOff;
 }
 
-substations.forEach(sub => {
-    if (!sub.url) return;
-    try {
-        const app = firebase.initializeApp({ databaseURL: sub.url }, sub.id);
-        firebase.database(app).ref().on('value', snapshot => {
-            const root = snapshot.val();
-            if (!root) return;
+document.getElementById(
+"segmentSelect"
+).addEventListener(
+"change",
+function(e){
 
-            let on = 0, off = 0;
-            Object.keys(root).forEach(key => {
-                if (key.toLowerCase().startsWith("relay") && root[key].status) {
-                    const status = root[key].status.toUpperCase();
-                    if (status === "ON") on++;
-                    else if (status === "OFF") off++;
-                }
-            });
-
-            liveData[sub.id] = {
-                on, off,
-                power: root.power || { voltage: 0, current: 0, power: 0, frequency: 0, pf: 0 },
-                lastUpdate: Date.now()
-            };
-            updateUI();
-        });
-    } catch(e) { console.error(e); }
-});
-
-document.getElementById("segmentSelect").addEventListener("change", e => {
     selectedSegment = e.target.value;
+
     updateUI();
 });
 
-// Periodic check execution loop to handle status transitions smoothly
-setInterval(updateUI, 5000);
+refreshAll();
+
+setInterval(refreshAll, 5000);
+
 </script>
+
 </body>
-</html>
+</html>,
