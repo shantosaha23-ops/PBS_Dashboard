@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport"
-content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Naogaon PBS-1 Central Feeder Monitor</title>
 
@@ -26,20 +25,19 @@ content="width=device-width, initial-scale=1.0">
 body{
     margin:0;
     padding:20px;
-    min-height:100vh;
     background:var(--bg);
-    font-family:Arial, sans-serif;
+    font-family:Arial,sans-serif;
     color:var(--text);
 }
 
 .monitor-card{
     width:100%;
-    max-width:900px;
+    max-width:950px;
     margin:auto;
     background:var(--card);
     border-radius:16px;
     padding:25px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.08);
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
 }
 
 header{
@@ -51,8 +49,8 @@ header{
 
 h1{
     margin:0;
-    font-size:1.5rem;
     color:var(--accent);
+    font-size:1.6rem;
 }
 
 .summary-grid{
@@ -72,14 +70,14 @@ h1{
 
 .stat-value{
     display:block;
-    font-size:2.3rem;
+    font-size:2.5rem;
     font-weight:bold;
 }
 
 .stat-label{
-    font-size:0.9rem;
     color:var(--gray);
     font-weight:bold;
+    font-size:0.9rem;
 }
 
 .pulse-online{
@@ -97,7 +95,7 @@ h1{
 
 select{
     width:100%;
-    max-width:300px;
+    max-width:320px;
     padding:12px;
     border-radius:8px;
     border:1px solid #d1d5db;
@@ -115,13 +113,14 @@ select{
     padding:16px;
     background:#fff;
     border:1px solid #e5e7eb;
+    transition:0.2s;
 }
 
 .sub-header{
     display:flex;
     justify-content:space-between;
     align-items:center;
-    margin-bottom:10px;
+    margin-bottom:12px;
     flex-wrap:wrap;
     gap:10px;
 }
@@ -145,17 +144,10 @@ select{
 .meta-info{
     display:flex;
     justify-content:space-between;
-    font-size:0.8rem;
-    color:var(--gray);
     flex-wrap:wrap;
     gap:10px;
-}
-
-.loading{
-    text-align:center;
-    padding:20px;
+    font-size:0.82rem;
     color:var(--gray);
-    font-style:italic;
 }
 
 @media(max-width:600px){
@@ -181,28 +173,20 @@ select{
 <div class="monitor-card">
 
 <header>
-    <h1>Naogaon PBS-1 Central Feeder Monitor</h1>
+<h1>Naogaon PBS-1 Central Feeder Monitor</h1>
 </header>
 
 <div class="summary-grid">
 
-    <div class="stat-item">
-        <span class="stat-value pulse-online"
-        id="totalOn">0</span>
+<div class="stat-item">
+<span class="stat-value pulse-online" id="totalOn">0</span>
+<span class="stat-label">FEEDERS ON</span>
+</div>
 
-        <span class="stat-label">
-        FEEDERS ON
-        </span>
-    </div>
-
-    <div class="stat-item">
-        <span class="stat-value pulse-offline"
-        id="totalOff">0</span>
-
-        <span class="stat-label">
-        FEEDERS OFF
-        </span>
-    </div>
+<div class="stat-item">
+<span class="stat-value pulse-offline" id="totalOff">0</span>
+<span class="stat-label">FEEDERS OFF</span>
+</div>
 
 </div>
 
@@ -210,153 +194,51 @@ select{
 
 <select id="segmentSelect">
 
-<option value="ALL">
-ALL SUBSTATIONS
-</option>
-
-<option value="HQ">
-HQ
-</option>
-
-<option value="Badalgachi">
-Badalgachi
-</option>
-
-<option value="Raninagor">
-Raninagor
-</option>
-
-<option value="Atrai">
-Atrai
-</option>
-
-<option value="Manda">
-Manda
-</option>
-
-<option value="Sotihat">
-Sotihat
-</option>
-
-<option value="Niamatpur">
-Niamatpur
-</option>
+<option value="ALL">ALL SUBSTATIONS</option>
+<option value="HQ">HQ</option>
+<option value="Badalgachi">Badalgachi</option>
+<option value="Raninagor">Raninagor</option>
+<option value="Atrai">Atrai</option>
+<option value="Manda">Manda</option>
+<option value="Sotihat">Sotihat</option>
+<option value="Niamatpur">Niamatpur</option>
 
 </select>
 
 </div>
 
-<div id="substationContainer"
-class="sub-list">
-
-<div class="loading">
-Loading Firebase Data...
-</div>
-
-</div>
+<div id="substationContainer" class="sub-list"></div>
 
 </div>
 
 <script>
 
-const OFFLINE_TIMEOUT = 65000;
+const OFFLINE_TIMEOUT = 60000;
 
 const substations = [
 
 {
-    id:"NG1(Sodor)",
-    segment:"HQ",
-    url:"https://naogaon-ss-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
+id:"NG1(Sodor)",
+segment:"HQ",
+url:"https://naogaon-ss-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
 },
 
 {
-    id:"NG2(Hogolbari)",
-    segment:"HQ",
-    url:"https://hogolbari-15117-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
+id:"NG2(Hogolbari)",
+segment:"HQ",
+url:"https://hogolbari-15117-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
 },
 
 {
-    id:"NG3(Dubolhati)",
-    segment:"HQ",
-    url:"https://dubolhati-fb64f-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
+id:"NG3(Dubolhati)",
+segment:"HQ",
+url:"https://dubolhati-fb64f-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
 },
 
 {
-    id:"MO2(Choumashia)",
-    segment:"HQ",
-    url:"https://choumashia-48c65-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
-},
-
-{
-    id:"BAD1(Bodolgachi)",
-    segment:"Badalgachi",
-    url:""
-},
-
-{
-    id:"RA1(Raninagor)",
-    segment:"Raninagor",
-    url:""
-},
-
-{
-    id:"RA2(Abadpukur)",
-    segment:"Raninagor",
-    url:""
-},
-
-{
-    id:"AT1(Atrai-Outdoor)",
-    segment:"Atrai",
-    url:""
-},
-
-{
-    id:"AT2(Atrai-Indoor)",
-    segment:"Atrai",
-    url:""
-},
-
-{
-    id:"AT3(Bandaikhara)",
-    segment:"Atrai",
-    url:""
-},
-
-{
-    id:"MAN1(Mandra)",
-    segment:"Manda",
-    url:""
-},
-
-{
-    id:"MAN2(Deluabari)",
-    segment:"Manda",
-    url:""
-},
-
-{
-    id:"MAN3(Sotihat)",
-    segment:"Sotihat",
-    url:""
-},
-
-{
-    id:"NIA1(Niamatpur)",
-    segment:"Niamatpur",
-    url:""
-},
-
-{
-    id:"NIA2(Sultanpur)",
-    segment:"Niamatpur",
-    url:""
-},
-
-{
-    id:"NIA3(Kapastia)",
-    segment:"Niamatpur",
-    url:""
+id:"MO2(Choumashia)",
+segment:"HQ",
+url:"https://choumashia-48c65-default-rtdb.asia-southeast1.firebasedatabase.app/.json"
 }
 
 ];
@@ -367,15 +249,15 @@ let selectedSegment = "ALL";
 
 async function loadFirebaseData(sub){
 
-    if(!sub.url) return;
-
     try{
 
         const response = await fetch(sub.url);
 
         const root = await response.json();
 
-        if(!root) return;
+        if(!root){
+            return;
+        }
 
         let on = 0;
         let off = 0;
@@ -465,39 +347,48 @@ function updateUI(){
 
         const data = liveData[sub.id];
 
-        if(!data){
-
-            container.innerHTML += `
-
-            <div class="sub-card">
-
-                <div class="sub-header">
-
-                    <span class="sub-name">
-                    ${sub.id}
-                    </span>
-
-                    <span class="pulse-offline">
-                    NO DATA
-                    </span>
-
-                </div>
-
-            </div>
-            `;
-
-            return;
-        }
-
         const isOnline =
-        (now - data.lastUpdate)
-        <
-        OFFLINE_TIMEOUT;
+        (
+            data &&
+            (now - data.lastUpdate)
+            <=
+            OFFLINE_TIMEOUT
+        );
+
+        let onDisplay = "---";
+        let offDisplay = "---";
+
+        let voltageDisplay = "---";
+        let currentDisplay = "---";
+        let powerDisplay = "---";
+        let frequencyDisplay = "---";
+        let pfDisplay = "---";
 
         if(isOnline){
 
             globalOn += data.on;
             globalOff += data.off;
+
+            onDisplay =
+            data.on + " ON";
+
+            offDisplay =
+            data.off + " OFF";
+
+            voltageDisplay =
+            data.power.voltage + " kV";
+
+            currentDisplay =
+            data.power.current + " A";
+
+            powerDisplay =
+            data.power.power + " MW";
+
+            frequencyDisplay =
+            data.power.frequency + " Hz";
+
+            pfDisplay =
+            data.power.pf;
         }
 
         container.innerHTML += `
@@ -518,18 +409,22 @@ function updateUI(){
 
                     <span class="
                     ${isOnline ?
-                    'pulse-online' : ''}
+                    'pulse-online'
+                    :
+                    'pulse-offline'}
                     ">
-                    ${data.on} ON
+                    ${onDisplay}
                     </span>
 
                     /
 
                     <span class="
                     ${isOnline ?
-                    'pulse-offline' : ''}
+                    'pulse-offline'
+                    :
+                    'pulse-offline'}
                     ">
-                    ${data.off} OFF
+                    ${offDisplay}
                     </span>
 
                 </span>
@@ -540,27 +435,27 @@ function updateUI(){
 
                 <span>
                 <b>V:</b>
-                ${data.power.voltage}
+                ${voltageDisplay}
                 </span>
 
                 <span>
                 <b>I:</b>
-                ${data.power.current}
+                ${currentDisplay}
                 </span>
 
                 <span>
                 <b>P:</b>
-                ${data.power.power}
+                ${powerDisplay}
                 </span>
 
                 <span>
                 <b>F:</b>
-                ${data.power.frequency}
+                ${frequencyDisplay}
                 </span>
 
                 <span>
                 <b>PF:</b>
-                ${data.power.pf}
+                ${pfDisplay}
                 </span>
 
             </div>
@@ -584,10 +479,16 @@ function updateUI(){
 
                 <span>
 
-                Updated:
-                ${new Date(
+                ${isOnline ?
+
+                'Updated: ' +
+                new Date(
                     data.lastUpdate
-                ).toLocaleTimeString()}
+                ).toLocaleTimeString()
+
+                :
+
+                'Heartbeat Lost (>60s)'}
 
                 </span>
 
@@ -621,7 +522,9 @@ refreshAll();
 
 setInterval(refreshAll, 5000);
 
+setInterval(updateUI, 1000);
+
 </script>
 
 </body>
-</html>,
+</html>
