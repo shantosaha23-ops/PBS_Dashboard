@@ -118,6 +118,8 @@ var scriptURL = "https://script.google.com/macros/s/AKfycbzZ7X01rhf8LdyIVTaedbVZ
 var lastSaved = 0;
 var myChart = null;
 var isGraphView = false;
+var currentRequestId = 0;
+
 
 const naogaonGroup = ["NG1(Sodor)","NG2(Hogolbari)","NG3(Dubolhati)","MO2(Choumashia)","BAD1(Bodolgachi)","RA1(Raninagor)","RA2(Abadpukur)","AT1(Atrai-Outdoor)","AT2(Atrai-Indoor)","AT3(Bandaikhara)"];
 const niamatpurGroup = ["MAN1(Mandra)","MAN2(Deluabari)","MAN3(Sotihat)","NIA1(Niamatpur)","NIA2(Sultanpur)","NIA3(Kapastia)"];
@@ -250,25 +252,47 @@ function createTable(isGrid) {
 }
 
 async function loadData() {
+    const requestId = ++currentRequestId;
+
     var ss = document.getElementById("ss").value;
     var dateInput = document.getElementById("date").value;
+
     if (!dateInput) return;
+
     let isGrid = ss.includes("Grid");
+
     createTable(isGrid);
+
     lastSaved = 0;
-    if (isGrid) await loadGridData(ss, dateInput); else fetchNormalData(ss, dateInput);
+
+    if (isGrid) {
+        await loadGridData(ss, dateInput, requestId);
+    } else {
+        fetchNormalData(ss, dateInput, requestId);
+    }
+
     if (isGraphView) updateChart();
 }
 
-function fetchNormalData(ss, dateInput) {
-    fetch(scriptURL + "?action=get&ss=" + ss + "&date=" + dateInput)
-    .then(res => res.json()).then(data => {
+function fetchNormalData(ss, dateInput, requestId) {
+
+    fetch(scriptURL + "?action=get&ss=" + encodeURIComponent(ss) + "&date=" + dateInput)
+    .then(res => res.json())
+    .then(data => {
+
+        // Ignore old response
+        if (requestId !== currentRequestId) return;
+
         data.sort((a,b) => a.hour - b.hour);
+
         data.forEach(row => {
             lockRow(row.hour, row.demand, row.supply, row.remarks, "Saved", false);
+
             if (row.hour > lastSaved) lastSaved = row.hour;
         });
+
         updateDeleteButtons();
+
         if (isGraphView) updateChart();
     });
 }
@@ -283,23 +307,67 @@ function updateDeleteButtons() {
     }
 }
 
-async function loadGridData(gridName, date) {
+async function loadGridData(gridName, date, requestId) {
+
     globalLock("Summing...");
-    let targetGroup = (gridName === "Naogaon Grid") ? naogaonGroup : (gridName === "Niamatpur Grid" ? niamatpurGroup : [...naogaonGroup, ...niamatpurGroup]);
+
+    let targetGroup =
+        (gridName === "Naogaon Grid")
+        ? naogaonGroup
+        : (gridName === "Niamatpur Grid"
+            ? niamatpurGroup
+            : [...naogaonGroup, ...niamatpurGroup]);
+
     let hourlyTotals = {};
-    for(let i=1; i<=24; i++) hourlyTotals[i] = { d: 0, s: 0 };
-    const results = await Promise.all(targetGroup.map(name => fetch(scriptURL + "?action=get&ss=" + name + "&date=" + date).then(r => r.json())));
-    results.forEach(substationData => substationData.forEach(row => {
-        hourlyTotals[row.hour].d += parseFloat(row.demand || 0);
-        hourlyTotals[row.hour].s += parseFloat(row.supply || 0);
-    }));
+
+    for(let i=1; i<=24; i++) {
+        hourlyTotals[i] = { d: 0, s: 0 };
+    }
+
+    const results = await Promise.all(
+        targetGroup.map(name =>
+            fetch(scriptURL + "?action=get&ss=" + encodeURIComponent(name) + "&date=" + date)
+            .then(r => r.json())
+        )
+    );
+
+    // Ignore old response
+    if (requestId !== currentRequestId) return;
+
+    results.forEach(substationData =>
+        substationData.forEach(row => {
+
+            hourlyTotals[row.hour].d += parseFloat(row.demand || 0);
+            hourlyTotals[row.hour].s += parseFloat(row.supply || 0);
+
+        })
+    );
+
     for(let h=1; h<=24; h++) {
+
         if(hourlyTotals[h].d > 0 || hourlyTotals[h].s > 0) {
-            let d = hourlyTotals[h].d, s = hourlyTotals[h].s, ls = Math.max(0, d - s), pls = d > 0 ? (ls / d * 100) : 0;
-            lockRow(h, d.toFixed(2), s.toFixed(2), "Total", "Grid", true, ls.toFixed(2), pls.toFixed(1));
+
+            let d = hourlyTotals[h].d;
+            let s = hourlyTotals[h].s;
+
+            let ls = Math.max(0, d - s);
+            let pls = d > 0 ? (ls / d * 100) : 0;
+
+            lockRow(
+                h,
+                d.toFixed(2),
+                s.toFixed(2),
+                "Total",
+                "Grid",
+                true,
+                ls.toFixed(2),
+                pls.toFixed(1)
+            );
         }
     }
+
     globalLock("Grid Mode");
+
     if (isGraphView) updateChart();
 }
 
