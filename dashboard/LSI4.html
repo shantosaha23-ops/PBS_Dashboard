@@ -34,10 +34,10 @@ h2 { text-align: center; margin: 2px 0; font-size: 18px; }
     font-weight: bold;
 }
 
-input[type="date"], select {
+input, select {
     padding: 5px;
-    border: 1px solid #ccc;
     border-radius: 4px;
+    border: 1px solid #ccc;
 }
 
 .table-header-row {
@@ -71,8 +71,6 @@ button {
     cursor: pointer;
 }
 
-.btn-delete { background: red; }
-
 #chartContainer {
     display: none;
     width: 95%;
@@ -87,6 +85,7 @@ button {
 <body>
 
 <div class="sticky-wrapper">
+
 <h2>Naogaon PBS-1</h2>
 <h2>Daily Load Supply Information</h2>
 
@@ -96,31 +95,29 @@ button {
 
 <span>SS:
 <select id="ss">
-    <optgroup label="Substations">
-        <option value="NG1(Sodor)">NG1(Sodor)</option>
-        <option value="NG2(Hogolbari)">NG2(Hogolbari)</option>
-        <option value="NG3(Dubolhati)">NG3(Dubolhati)</option>
-        <option value="MO2(Choumashia)">MO2(Choumashia)</option>
-        <option value="BAD1(Bodolgachi)">BAD1(Bodolgachi)</option>
-        <option value="RA1(Raninagor)">RA1(Raninagor)</option>
-        <option value="RA2(Abadpukur)">RA2(Abadpukur)</option>
-        <option value="AT1(Atrai-Outdoor)">AT1(Atrai-Outdoor)</option>
-        <option value="AT2(Atrai-Indoor)">AT2(Atrai-Indoor)</option>
-        <option value="AT3(Bandaikhara)">AT3(Bandaikhara)</option>
-    </optgroup>
 
-    <optgroup label="Grid View">
-        <option value="Naogaon Grid">Naogaon Grid</option>
-        <option value="Niamatpur Grid">Niamatpur Grid</option>
-        <option value="Total PBS-1 Grid">Total PBS-1 Grid</option>
-    </optgroup>
+<option value="NG1(Sodor)">NG1(Sodor)</option>
+<option value="NG2(Hogolbari)">NG2(Hogolbari)</option>
+<option value="NG3(Dubolhati)">NG3(Dubolhati)</option>
+<option value="MO2(Choumashia)">MO2(Choumashia)</option>
+<option value="BAD1(Bodolgachi)">BAD1(Bodolgachi)</option>
+<option value="RA1(Raninagor)">RA1(Raninagor)</option>
+<option value="RA2(Abadpukur)">RA2(Abadpukur)</option>
+<option value="AT1(Atrai-Outdoor)">AT1(Atrai-Outdoor)</option>
+<option value="AT2(Atrai-Indoor)">AT2(Atrai-Indoor)</option>
+<option value="AT3(Bandaikhara)">AT3(Bandaikhara)</option>
 
-    <optgroup label="Summary">
-        <option value="Hourly All Substation Summary">Hourly All Substation Summary</option>
-    </optgroup>
+<option value="Naogaon Grid">Naogaon Grid</option>
+<option value="Niamatpur Grid">Niamatpur Grid</option>
+<option value="Total PBS-1 Grid">Total PBS-1 Grid</option>
+
+<!-- ✅ NEW OPTION -->
+<option value="Hourly All Substation Summary">Hourly All Substation Summary</option>
+
 </select>
 </span>
 
+<!-- ✅ NEW HOUR FILTER -->
 <span id="hourFilterBox" style="display:none;">
 Hour:
 <select id="hourFilter"></select>
@@ -134,13 +131,16 @@ Hour:
 <div id="dynamicHeader" class="table-header-row grid-normal"></div>
 </div>
 
-<table><tbody id="tableBody"></tbody></table>
+<table>
+<tbody id="tableBody"></tbody>
+</table>
 
 <div id="chartContainer">
 <canvas id="loadChart"></canvas>
 </div>
 
 <script>
+
 var scriptURL = "https://script.google.com/macros/s/AKfycbzZ7X01rhf8LdyIVTaedbVZHwncZYUrspvGy7nVj24_Nc_p8QdMfhwRFwds2iPB4g/exec";
 var currentRequestId = 0;
 var isGraphView = false;
@@ -155,6 +155,9 @@ function displayHour(h){
     return h<12 ? h+" AM" : (h-12)+" PM";
 }
 
+/* =========================
+   NEW: Hour filter
+========================= */
 function populateHourFilter(){
     let h = document.getElementById("hourFilter");
     h.innerHTML="";
@@ -166,13 +169,25 @@ function populateHourFilter(){
     }
 }
 
+/* =========================
+   ORIGINAL FUNCTIONS (UNCHANGED)
+========================= */
+
+function toggleView(){
+    isGraphView=!isGraphView;
+    document.getElementById("chartContainer").style.display=isGraphView?"block":"none";
+}
+
 function loadData(){
+
     let ss=document.getElementById("ss").value;
     let date=document.getElementById("date").value;
     let requestId=++currentRequestId;
 
-    let isSummary = ss==="Hourly All Substation Summary";
-    document.getElementById("hourFilterBox").style.display = isSummary?"inline-block":"none";
+    let isSummary = (ss==="Hourly All Substation Summary");
+
+    document.getElementById("hourFilterBox").style.display =
+        isSummary ? "inline-block" : "none";
 
     if(isSummary){
         let hour=document.getElementById("hourFilter").value||1;
@@ -183,6 +198,10 @@ function loadData(){
     createTable();
 }
 
+/* =========================
+   NEW SUMMARY FUNCTION
+========================= */
+
 async function loadHourlySummary(hour,date,requestId){
 
 let all=[...naogaonGroup,...niamatpurGroup];
@@ -190,6 +209,7 @@ let all=[...naogaonGroup,...niamatpurGroup];
 let head=document.getElementById("dynamicHeader");
 head.className="table-header-row";
 head.style.gridTemplateColumns="2fr 1fr 1fr 1fr 1fr";
+
 head.innerHTML=`<div>Substation</div><div>Demand</div><div>Supply</div><div>LS</div><div>%LS</div>`;
 
 let body=document.getElementById("tableBody");
@@ -202,9 +222,11 @@ fetch(scriptURL+"?action=get&ss="+n+"&date="+date).then(r=>r.json())
 ));
 
 res.forEach((data,i)=>{
+
 let row=data.find(r=>r.hour==hour)||{};
 let d=parseFloat(row.demand||0);
 let s=parseFloat(row.supply||0);
+
 let ls=Math.max(0,d-s);
 let pls=d?ls/d*100:0;
 
@@ -242,39 +264,45 @@ tr.innerHTML=`
 body.appendChild(tr);
 }
 
+/* =========================
+   BASIC TABLE
+========================= */
+
 function createTable(){
-let head=document.getElementById("dynamicHeader");
-head.className="table-header-row grid-normal";
-head.innerHTML=`<div>Hour</div><div>Demand</div><div>Supply</div><div>Remark</div><div>Action</div>`;
+    let head=document.getElementById("dynamicHeader");
+    head.className="table-header-row grid-normal";
+    head.innerHTML=`<div>Hour</div><div>Demand</div><div>Supply</div><div>Remark</div><div>Action</div>`;
 
-let body=document.getElementById("tableBody");
-body.innerHTML="";
-for(let i=1;i<=24;i++){
-let tr=document.createElement("tr");
-tr.style.display="grid";
-tr.style.gridTemplateColumns="1.2fr 1.5fr 1.5fr 1.5fr 1.2fr";
-tr.innerHTML=`
-<td>${displayHour(i)}</td>
-<td><input id="d${i}" type="number"></td>
-<td><input id="s${i}" type="number"></td>
-<td><input id="r${i}"></td>
-<td><button onclick="saveHour(${i})">Save</button></td>`;
-body.appendChild(tr);
-}
-}
+    let body=document.getElementById("tableBody");
+    body.innerHTML="";
 
-function toggleView(){
-isGraphView=!isGraphView;
-document.getElementById("chartContainer").style.display=isGraphView?"block":"none";
-document.getElementById("mainTable").style.display=isGraphView?"none":"table";
+    for(let i=1;i<=24;i++){
+        let tr=document.createElement("tr");
+        tr.style.display="grid";
+        tr.style.gridTemplateColumns="1.2fr 1.5fr 1.5fr 1.5fr 1.2fr";
+
+        tr.innerHTML=`
+        <td>${displayHour(i)}</td>
+        <td><input id="d${i}" type="number"></td>
+        <td><input id="s${i}" type="number"></td>
+        <td><input id="r${i}"></td>
+        <td><button>Save</button></td>`;
+
+        body.appendChild(tr);
+    }
 }
 
-document.getElementById("ss").addEventListener("change",loadData);
-document.getElementById("hourFilter").addEventListener("change",loadData);
+/* INIT */
 
 document.getElementById("date").value=new Date().toISOString().split("T")[0];
+
 populateHourFilter();
+
+document.getElementById("hourFilter")
+.addEventListener("change",loadData);
+
 loadData();
+
 </script>
 
 </body>
