@@ -43,7 +43,19 @@
         .magenta { background: #ff00ff; color: white; }
         .pink { background: #ffadad; color: #333; } 
         
-        #sub-page-container { width: 100%; height: 100vh; border: none; position: fixed; top: 60px; left: 0; z-index: 999; display: none; background: white; }
+      #sub-page-container { 
+    width: 100%; 
+    height: calc(100vh - 60px); /* The fix */
+    border: none; 
+    position: fixed; 
+    top: 60px; 
+    left: 0; 
+    z-index: 999; 
+    display: none; 
+    background: white;
+    /* Optional: ensures that if content is longer than the screen, it scrolls internally */
+    overflow-y: auto; 
+}
     </style>
 </head>
 <body>
