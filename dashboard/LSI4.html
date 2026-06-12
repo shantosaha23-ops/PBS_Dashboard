@@ -55,7 +55,8 @@
         #refresh { background: #4CAF50; padding: 6px 15px; }
         #toggleView { background: #f39c12; padding: 6px 15px; }
         
-        .total-row { background-color: #eef7ff; font-weight: bold; }
+        .subtotal-row { background-color: #f9fbfd; font-weight: bold; color: #333; }
+        .total-row { background-color: #eef7ff; font-weight: bold; color: #000; }
         
         #chartContainer {
             display: none; width: 95%; max-width: 800px; margin: 20px auto;
@@ -332,8 +333,8 @@ async function loadHourlySummaryData(date, requestId) {
 
     if (requestId !== currentRequestId) return;
 
-    let totalDemand = 0;
-    let totalSupply = 0;
+    let naogaonDemand = 0, naogaonSupply = 0;
+    let niamatpurDemand = 0, niamatpurSupply = 0;
 
     allSubstations.forEach((subName, index) => {
         const subData = results[index];
@@ -344,8 +345,13 @@ async function loadHourlySummaryData(date, requestId) {
         let ls = Math.max(0, d - s);
         let pls = d > 0 ? (ls / d * 100) : 0;
 
-        totalDemand += d;
-        totalSupply += s;
+        if (naogaonGroup.includes(subName)) {
+            naogaonDemand += d;
+            naogaonSupply += s;
+        } else if (niamatpurGroup.includes(subName)) {
+            niamatpurDemand += d;
+            niamatpurSupply += s;
+        }
 
         let row = document.createElement("tr");
         row.className = "grid-summarymode";
@@ -360,6 +366,39 @@ async function loadHourlySummaryData(date, requestId) {
         body.appendChild(row);
     });
 
+    // 1. Calculate and append Naogaon Grid Subtotal
+    let naoLs = Math.max(0, naogaonDemand - naogaonSupply);
+    let naoPls = naogaonDemand > 0 ? (naoLs / naogaonDemand * 100) : 0;
+    let naoRow = document.createElement("tr");
+    naoRow.className = "grid-summarymode subtotal-row";
+    naoRow.style.display = "grid";
+    naoRow.innerHTML = `
+        <td>Naogaon Grid Sum (1-10)</td>
+        <td>${naogaonDemand.toFixed(2)}</td>
+        <td>${naogaonSupply.toFixed(2)}</td>
+        <td>${naoLs.toFixed(2)}</td>
+        <td>${naogaonDemand > 0 ? naoPls.toFixed(1) + "%" : "0.0%"}</td>
+    `;
+    body.appendChild(naoRow);
+
+    // 2. Calculate and append Niamatpur Grid Subtotal
+    let niaLs = Math.max(0, niamatpurDemand - niamatpurSupply);
+    let niaPls = niamatpurDemand > 0 ? (niaLs / niamatpurDemand * 100) : 0;
+    let niaRow = document.createElement("tr");
+    niaRow.className = "grid-summarymode subtotal-row";
+    niaRow.style.display = "grid";
+    niaRow.innerHTML = `
+        <td>Niamatpur Grid Sum (11-16)</td>
+        <td>${niamatpurDemand.toFixed(2)}</td>
+        <td>${niamatpurSupply.toFixed(2)}</td>
+        <td>${niaLs.toFixed(2)}</td>
+        <td>${niamatpurDemand > 0 ? niaPls.toFixed(1) + "%" : "0.0%"}</td>
+    `;
+    body.appendChild(niaRow);
+
+    // 3. Calculate and append Combined Total Row
+    let totalDemand = naogaonDemand + niamatpurDemand;
+    let totalSupply = naogaonSupply + niamatpurSupply;
     let totalLs = Math.max(0, totalDemand - totalSupply);
     let totalPls = totalDemand > 0 ? (totalLs / totalDemand * 100) : 0;
 
