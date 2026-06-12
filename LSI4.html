@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Load Supply Entry - Naogaon PBS-1</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; padding-top: 220px; }
+        .sticky-wrapper {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: #f4f6f8;
+            z-index: 2000;
+            padding: 10px 10px 0 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h2 { text-align: center; margin: 2px 0; color: #333; font-size: 18px; }
+        .controls { 
+            background: white; padding: 10px; border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-top: 5px;
+            font-size: 14px; font-weight: bold;
+            display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px;
+        }
+        select optgroup {
+            font-weight: bold;
+            color: #000;
+            font-style: normal;
+        }
+        input[type="date"], select { 
+            font-size: 14px; padding: 5px; border: 1px solid #ccc; border-radius: 4px;
+        }
+        .table-header-row {
+            display: grid; background-color: #2d9cff; color: white;
+            margin-top: 10px; border-radius: 4px 4px 0 0;
+            font-size: 12px; font-weight: bold; text-align: center; padding: 12px 0;
+            text-transform: uppercase;
+        }
+        .grid-normal { grid-template-columns: 1.2fr 1.5fr 1.5fr 1.5fr 1.2fr; }
+        .grid-gridmode { grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr; }
+        .grid-summarymode { grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; }
+        td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        input[type="number"], .remark-input { 
+            width: 90%; padding: 6px; font-size: 13px; 
+            border: 1px solid #ccc; border-radius: 4px; text-align: center;
+        }
+        .action-cell { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+        button { 
+            padding: 8px 5px; background: #2d9cff; color: white; 
+            border: none; cursor: pointer; border-radius: 4px; font-weight: bold;
+        }
+        .btn-delete { background: #ff4d4d !important; font-size: 11px; padding: 4px; }
+        #refresh { background: #4CAF50; padding: 6px 15px; }
+        #toggleView { background: #f39c12; padding: 6px 15px; }
+        
+        .subtotal-row { background-color: #f9fbfd; font-weight: bold; color: #333; }
+        .total-row { background-color: #eef7ff; font-weight: bold; color: #000; }
+        
+        #chartContainer {
+            display: none; width: 95%; max-width: 800px; margin: 20px auto;
+            background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 600px) {
+            body { padding-top: 250px; }
+            .table-header-row { font-size: 10px; }
+            td { padding: 5px 2px; font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sticky-wrapper">
+    <h2>Naogaon PBS-1</h2>
+    <h2>Daily Load Supply Information</h2>
+    <div class="controls">
+        <span>Date: <input type="date" id="date"></span>
+        
+        <span id="hourFilterContainer" style="display: none;">Hour: 
+            <select id="selectedHour"></select>
+        </span>
+
+        <span>SS: 
+        <select id="ss">
+            <optgroup label="Naogaon Grid Sub-stations (1-10)">
+                <option value="NG1(Sodor)">NG1(Sodor)</option>
+                <option value="NG2(Hogolbari)">NG2(Hogolbari)</option>
+                <option value="NG3(Dubolhati)">NG3(Dubolhati)</option>
+                <option value="MO2(Choumashia)">MO2(Choumashia)</option>
+                <option value="BAD1(Bodolgachi)">BAD1(Bodolgachi)</option>
+                <option value="RA1(Raninagor)">RA1(Raninagor)</option>
+                <option value="RA2(Abadpukur)">RA2(Abadpukur)</option>
+                <option value="AT1(Atrai-Outdoor)">AT1(Atrai-Outdoor)</option>
+                <option value="AT2(Atrai-Indoor)">AT2(Atrai-Indoor)</option>
+                <option value="AT3(Bandaikhara)">AT3(Bandaikhara)</option>
+            </optgroup>
+            <optgroup label="Niamatpur Grid Sub-stations (11-16)">
+                <option value="MAN1(Mandra)">MAN1(Mandra)</option>
+                <option value="MAN2(Deluabari)">MAN2(Deluabari)</option>
+                <option value="MAN3(Sotihat)">MAN3(Sotihat)</option>
+                <option value="NIA1(Niamatpur)">NIA1(Niamatpur)</option>
+                <option value="NIA2(Sultanpur)">NIA2(Sultanpur)</option>
+                <option value="NIA3(Kapastia)">NIA3(Kapastia)</option>
+            </optgroup>
+            <optgroup label="Grids (View Only)">
+                <option value="Naogaon Grid">Naogaon Grid (Sum 1-10)</option>
+                <option value="Niamatpur Grid">Niamatpur Grid (Sum 11-16)</option>
+                <option value="Total PBS-1 Grid">Total Naogaon PBS-1 Grid (Sum 1-16)</option>
+            </optgroup>
+            <optgroup label="Summary View">
+                <option value="Hourly All Summary">Hourly All Substation Summary</option>
+            </optgroup>
+        </select></span>
+        <button id="refresh" onclick="loadData()">Refresh</button>
+        <button id="toggleView" onclick="toggleView()">Show Graph</button>
+    </div>
+    <div id="dynamicHeader" class="table-header-row grid-normal"></div>
+</div>
+
+<table id="mainTable"><tbody id="tableBody"></tbody></table>
+
+<div id="chartContainer">
+    <canvas id="loadChart"></canvas>
+</div>
+
+<script>
+var scriptURL = "https://script.google.com/macros/s/AKfycbzZ7X01rhf8LdyIVTaedbVZHwncZYUrspvGy7nVj24_Nc_p8QdMfhwRFwds2iPB4g/exec";
+var lastSaved = 0;
+var myChart = null;
+var isGraphView = false;
+var currentRequestId = 0;
+
+const naogaonGroup = ["NG1(Sodor)","NG2(Hogolbari)","NG3(Dubolhati)","MO2(Choumashia)","BAD1(Bodolgachi)","RA1(Raninagor)","RA2(Abadpukur)","AT1(Atrai-Outdoor)","AT2(Atrai-Indoor)","AT3(Bandaikhara)"];
+const niamatpurGroup = ["MAN1(Mandra)","MAN2(Deluabari)","MAN3(Sotihat)","NIA1(Niamatpur)","NIA2(Sultanpur)","NIA3(Kapastia)"];
+
+(function populateHourDropdown() {
+    const hrSelect = document.getElementById("selectedHour");
+    for (let i = 1; i <= 24; i++) {
+        let opt = document.createElement("option");
+        opt.value = i;
+        opt.innerText = displayHour(i);
+        hrSelect.appendChild(opt);
+    }
+})();
+
+function toggleView() {
+    isGraphView = !isGraphView;
+    const table = document.getElementById("mainTable");
+    const chartCont = document.getElementById("chartContainer");
+    const btn = document.getElementById("toggleView");
+
+    if (isGraphView) {
+        table.style.display = "none";
+        chartCont.style.display = "block";
+        btn.innerText = "Show Table";
+        updateChart();
+    } else {
+        table.style.display = "table";
+        chartCont.style.display = "none";
+        btn.innerText = "Show Graph";
+    }
+}
+
+function updateChart() {
+    if(document.getElementById("ss").value === "Hourly All Summary") return;
+
+    const labels = [];
+    const demandData = [];
+    const supplyData = [];
+
+    for (let i = 1; i <= 24; i++) {
+        const dVal = parseFloat(document.getElementById("d" + i).value);
+        const sVal = parseFloat(document.getElementById("s" + i).value);
+        
+        if (!isNaN(dVal)) {
+            labels.push(displayHour(i));
+            demandData.push(dVal);
+            supplyData.push(sVal || 0);
+        }
+    }
+
+    const ctx = document.getElementById('loadChart').getContext('2d');
+    
+    if (myChart) myChart.destroy();
+
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Demand',
+                data: demandData,
+                borderColor: '#2d9cff',
+                backgroundColor: 'rgba(45, 156, 255, 0.1)',
+                fill: true,
+                tension: 0.3
+            }, {
+                label: 'Supply',
+                data: supplyData,
+                borderColor: '#4CAF50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: { display: true, text: 'Hourly Load Analysis' }
+            },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'MW' } }
+            }
+        }
+    });
+}
+
+function getLocalDateString(date) {
+    let d = new Date(date);
+    let month = '' + (d.getMonth() + 1);
+    let day = '' + d.getDate();
+    let year = d.getFullYear();
+    if (month.length < 2) month = '0' + month;
+    if (day.length < 2) day = '0' + day;
+    return [year, month, day].join('-');
+}
+
+function isEditableDate(selectedDateStr) {
+    const today = getLocalDateString(new Date());
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = getLocalDateString(yesterdayDate);
+    return selectedDateStr === today || selectedDateStr === yesterday;
+}
+
+function displayHour(h) {
+    if(h==24) return "12 AM";
+    if(h==12) return "12 PM";
+    return h < 12 ? h+" AM" : (h-12)+" PM";
+}
+
+function createTable(isGrid) {
+    var head = document.getElementById("dynamicHeader");
+    var body = document.getElementById("tableBody");
+    var dateVal = document.getElementById("date").value;
+    var ssVal = document.getElementById("ss").value;
+    var editable = isEditableDate(dateVal);
+    
+    if(ssVal === "Hourly All Summary") {
+        head.className = "table-header-row grid-summarymode";
+        head.innerHTML = "<div>Substation</div><div>Demand</div><div>Supply</div><div>LS</div><div>%LS</div>";
+        body.innerHTML = "";
+        return;
+    }
+
+    if(isGrid) {
+        head.className = "table-header-row grid-gridmode";
+        head.innerHTML = "<div>Hour</div><div>Demand</div><div>Supply</div><div>LS</div><div>%LS</div><div>Remark</div><div>Action</div>";
+    } else {
+        head.className = "table-header-row grid-normal";
+        head.innerHTML = "<div>Hour</div><div>Demand</div><div>Supply</div><div>Remark</div><div>Action</div>";
+    }
+    body.innerHTML = "";
+    for(let i=1; i<=24; i++) {
+        let row = document.createElement("tr");
+        row.className = isGrid ? "grid-gridmode" : "grid-normal";
+        row.style.display = "grid";
+        let html = `<td>${displayHour(i)}</td><td><input type="number" id="d${i}"></td><td><input type="number" id="s${i}"></td>`;
+        if(isGrid) html += `<td><input type="number" id="ls${i}" disabled></td><td><input type="number" id="pls${i}" disabled></td>`;
+        html += `<td class="action-cell"><input class="remark-input" id="r${i}"></td>
+                 <td class="action-cell">
+                    <button id="btn${i}" onclick="saveHour(${i})">Save</button>
+                    <button id="del${i}" class="btn-delete" style="display:none;" onclick="deleteHour(${i})">Edit</button>
+                 </td>`;
+        row.innerHTML = html;
+        body.appendChild(row);
+        if(!editable) lockRow(i, "", "", "", "View", isGrid, "", "");
+    }
+}
+
+async function loadData() {
+    const requestId = ++currentRequestId;
+
+    var ss = document.getElementById("ss").value;
+    var dateInput = document.getElementById("date").value;
+    var hrContainer = document.getElementById("hourFilterContainer");
+    var toggleViewBtn = document.getElementById("toggleView");
+
+    if (!dateInput) return;
+
+    if (ss === "Hourly All Summary") {
+        hrContainer.style.display = "inline";
+        toggleViewBtn.style.display = "none";
+        if (isGraphView) toggleView();
+        
+        createTable(false);
+        await loadHourlySummaryData(dateInput, requestId);
+    } else {
+        hrContainer.style.display = "none";
+        toggleViewBtn.style.display = "inline";
+        
+        let isGrid = ss.includes("Grid");
+        createTable(isGrid);
+        lastSaved = 0;
+
+        if (isGrid) {
+            await loadGridData(ss, dateInput, requestId);
+        } else {
+            fetchNormalData(ss, dateInput, requestId);
+        }
+
+        if (isGraphView) updateChart();
+    }
+}
+
+async function loadHourlySummaryData(date, requestId) {
+    globalLock("Loading...");
+    
+    const targetHour = parseInt(document.getElementById("selectedHour").value);
+    const allSubstations = [...naogaonGroup, ...niamatpurGroup];
+    var body = document.getElementById("tableBody");
+    body.innerHTML = "";
+
+    const results = await Promise.all(
+        allSubstations.map(name =>
+            fetch(scriptURL + "?action=get&ss=" + encodeURIComponent(name) + "&date=" + date)
+            .then(r => r.json())
+            .catch(() => [])
+        )
+    );
+
+    if (requestId !== currentRequestId) return;
+
+    let naogaonDemand = 0, naogaonSupply = 0;
+    let niamatpurDemand = 0, niamatpurSupply = 0;
+
+    allSubstations.forEach((subName, index) => {
+        const subData = results[index];
+        const hourlyRecord = subData.find(row => parseInt(row.hour) === targetHour);
+        
+        let d = hourlyRecord ? parseFloat(hourlyRecord.demand || 0) : 0;
+        let s = hourlyRecord ? parseFloat(hourlyRecord.supply || 0) : 0;
+        let ls = Math.max(0, d - s);
+        let pls = d > 0 ? (ls / d * 100) : 0;
+
+        if (naogaonGroup.includes(subName)) {
+            naogaonDemand += d;
+            naogaonSupply += s;
+        } else if (niamatpurGroup.includes(subName)) {
+            niamatpurDemand += d;
+            niamatpurSupply += s;
+        }
+
+        let row = document.createElement("tr");
+        row.className = "grid-summarymode";
+        row.style.display = "grid";
+        row.innerHTML = `
+            <td>${subName}</td>
+            <td>${d > 0 ? d.toFixed(2) : "-"}</td>
+            <td>${s > 0 ? s.toFixed(2) : "-"}</td>
+            <td>${ls > 0 ? ls.toFixed(2) : "-"}</td>
+            <td>${d > 0 ? pls.toFixed(1) + "%" : "-"}</td>
+        `;
+        body.appendChild(row);
+    });
+
+    // 1. Calculate and append Naogaon Grid Subtotal
+    let naoLs = Math.max(0, naogaonDemand - naogaonSupply);
+    let naoPls = naogaonDemand > 0 ? (naoLs / naogaonDemand * 100) : 0;
+    let naoRow = document.createElement("tr");
+    naoRow.className = "grid-summarymode subtotal-row";
+    naoRow.style.display = "grid";
+    naoRow.innerHTML = `
+        <td>Naogaon Grid Sum (1-10)</td>
+        <td>${naogaonDemand.toFixed(2)}</td>
+        <td>${naogaonSupply.toFixed(2)}</td>
+        <td>${naoLs.toFixed(2)}</td>
+        <td>${naogaonDemand > 0 ? naoPls.toFixed(1) + "%" : "0.0%"}</td>
+    `;
+    body.appendChild(naoRow);
+
+    // 2. Calculate and append Niamatpur Grid Subtotal
+    let niaLs = Math.max(0, niamatpurDemand - niamatpurSupply);
+    let niaPls = niamatpurDemand > 0 ? (niaLs / niamatpurDemand * 100) : 0;
+    let niaRow = document.createElement("tr");
+    niaRow.className = "grid-summarymode subtotal-row";
+    niaRow.style.display = "grid";
+    niaRow.innerHTML = `
+        <td>Niamatpur Grid Sum (11-16)</td>
+        <td>${niamatpurDemand.toFixed(2)}</td>
+        <td>${niamatpurSupply.toFixed(2)}</td>
+        <td>${niaLs.toFixed(2)}</td>
+        <td>${niamatpurDemand > 0 ? niaPls.toFixed(1) + "%" : "0.0%"}</td>
+    `;
+    body.appendChild(niaRow);
+
+    // 3. Calculate and append Combined Total Row
+    let totalDemand = naogaonDemand + niamatpurDemand;
+    let totalSupply = naogaonSupply + niamatpurSupply;
+    let totalLs = Math.max(0, totalDemand - totalSupply);
+    let totalPls = totalDemand > 0 ? (totalLs / totalDemand * 100) : 0;
+
+    let totalRow = document.createElement("tr");
+    totalRow.className = "grid-summarymode total-row";
+    totalRow.style.display = "grid";
+    totalRow.innerHTML = `
+        <td>TOTAL (SUM)</td>
+        <td>${totalDemand.toFixed(2)}</td>
+        <td>${totalSupply.toFixed(2)}</td>
+        <td>${totalLs.toFixed(2)}</td>
+        <td>${totalDemand > 0 ? totalPls.toFixed(1) + "%" : "0.0%"}</td>
+    `;
+    body.appendChild(totalRow);
+
+    var inputs = document.getElementsByTagName("input"), buttons = document.getElementsByTagName("button"), selects = document.getElementsByTagName("select");
+    for (var i = 0; i < inputs.length; i++) if(inputs[i].id === "date") inputs[i].disabled = false;
+    for (var j = 0; j < buttons.length; j++) if(buttons[j].id === "refresh") { buttons[j].disabled = false; buttons[j].innerText = "Refresh"; }
+    for (var k = 0; k < selects.length; k++) {
+        if(selects[k].id === "ss" || selects[k].id === "selectedHour") selects[k].disabled = false;
+    }
+}
+
+function fetchNormalData(ss, dateInput, requestId) {
+    fetch(scriptURL + "?action=get&ss=" + encodeURIComponent(ss) + "&date=" + dateInput)
+    .then(res => res.json())
+    .then(data => {
+        if (requestId !== currentRequestId) return;
+
+        data.sort((a,b) => a.hour - b.hour);
+
+        data.forEach(row => {
+            lockRow(row.hour, row.demand, row.supply, row.remarks, "Saved", false);
+            if (row.hour > lastSaved) lastSaved = row.hour;
+        });
+
+        updateDeleteButtons();
+        if (isGraphView) updateChart();
+    });
+}
+
+function updateDeleteButtons() {
+    const editable = isEditableDate(document.getElementById("date").value);
+    for(let i=1; i<=24; i++) {
+        let delBtn = document.getElementById("del"+i);
+        if(delBtn) {
+            delBtn.style.display = (i === lastSaved && editable) ? "block" : "none";
+        }
+    }
+}
+
+async function loadGridData(gridName, date, requestId) {
+    globalLock("Summing...");
+
+    let targetGroup =
+        (gridName === "Naogaon Grid")
+        ? naogaonGroup
+        : (gridName === "Niamatpur Grid"
+            ? niamatpurGroup
+            : [...naogaonGroup, ...niamatpurGroup]);
+
+    let hourlyTotals = {};
+
+    for(let i=1; i<=24; i++) {
+        hourlyTotals[i] = { d: 0, s: 0 };
+    }
+
+    const results = await Promise.all(
+        targetGroup.map(name =>
+            fetch(scriptURL + "?action=get&ss=" + encodeURIComponent(name) + "&date=" + date)
+            .then(r => r.json())
+        )
+    );
+
+    if (requestId !== currentRequestId) return;
+
+    results.forEach(substationData =>
+        substationData.forEach(row => {
+            hourlyTotals[row.hour].d += parseFloat(row.demand || 0);
+            hourlyTotals[row.hour].s += parseFloat(row.supply || 0);
+        })
+    );
+
+    for(let h=1; h<=24; h++) {
+        if(hourlyTotals[h].d > 0 || hourlyTotals[h].s > 0) {
+            let d = hourlyTotals[h].d;
+            let s = hourlyTotals[h].s;
+            let ls = Math.max(0, d - s);
+            let pls = d > 0 ? (ls / d * 100) : 0;
+
+            lockRow(
+                h,
+                d.toFixed(2),
+                s.toFixed(2),
+                "Total",
+                "Grid",
+                true,
+                ls.toFixed(2),
+                pls.toFixed(1)
+            );
+        }
+    }
+
+    globalLock("Grid Mode");
+    if (isGraphView) updateChart();
+}
+
+function lockRow(h, d, s, r, btnText, isGrid, ls, pls) {
+    let dIn = document.getElementById("d" + h), sIn = document.getElementById("s" + h), rIn = document.getElementById("r" + h), btn = document.getElementById("btn" + h);
+    if(!dIn) return;
+    if(d !== "") dIn.value = d; if(s !== "") sIn.value = s; if(r !== "") rIn.value = r;
+    dIn.disabled = sIn.disabled = rIn.disabled = btn.disabled = true;
+    if(isGrid) { 
+        if(ls !== "") document.getElementById("ls" + h).value = ls; 
+        if(pls !== "") document.getElementById("pls" + h).value = pls; 
+    }
+    btn.innerText = btnText; btn.style.background = "#6c757d";
+}
+
+function deleteHour(h) {
+    if(!confirm("Are you sure you want to edit data?")) return;
+    
+    var password = prompt("Enter Admin Password to confirm edit:");
+    if (!password) return; 
+
+    var ss = document.getElementById("ss").value;
+    var date = document.getElementById("date").value;
+
+    fetch(scriptURL + "?action=delete&ss=" + ss + "&date=" + date + "&hour=" + h + "&pass=" + encodeURIComponent(password))
+    .then(res => res.text())
+    .then(data => {
+        alert(data);
+        loadData();
+    });
+}
+
+function globalLock(msg) {
+    var inputs = document.getElementsByTagName("input"), buttons = document.getElementsByTagName("button"), selects = document.getElementsByTagName("select");
+    for (var i = 0; i < inputs.length; i++) if(inputs[i].id !== "date") inputs[i].disabled = true;
+    for (var j = 0; j < buttons.length; j++) if(buttons[j].id !== "refresh" && buttons[j].id !== "toggleView") { buttons[j].disabled = true; buttons[j].innerText = msg; }
+    for (var k = 0; k < selects.length; k++) {
+        if(selects[k].id === "ss" || selects[k].id === "selectedHour") {
+            selects[k].disabled = false;
+        } else {
+            selects[k].disabled = true;
+        }
+    }
+}
+
+function saveHour(h) {
+    if(!isEditableDate(document.getElementById("date").value)) { alert("Only Today and Yesterday data can be entered."); return; }
+    if(h != lastSaved + 1) { alert("Previous hour must be filled first!"); return; }
+    var ss = document.getElementById("ss").value, date = document.getElementById("date").value;
+    var demand = parseFloat(document.getElementById("d"+h).value), supply = parseFloat(document.getElementById("s"+h).value), remarks = document.getElementById("r"+h).value;
+    if(isNaN(demand) || isNaN(supply)) { alert("Enter Demand and Supply."); return; }
+    if(demand < supply) { alert("Invalid Entry: Demand must be greater than or equal to Supply."); return; }
+    var btn = document.getElementById("btn"+h); btn.disabled = true; btn.innerText = "...";
+    fetch(scriptURL+"?action=save&ss="+ss+"&date="+date+"&hour="+h+"&demand="+demand+"&supply="+supply+"&remarks="+remarks)
+    .then(res => res.text()).then(data => { alert(data); loadData(); })
+    .catch(err => { alert("Error."); btn.disabled = false; btn.innerText = "Save"; });
+}
+
+document.getElementById("ss").addEventListener("change", loadData);
+document.getElementById("date").addEventListener("change", loadData);
+document.getElementById("selectedHour").addEventListener("change", loadData);
+document.getElementById("date").value = getLocalDateString(new Date());
+loadData();
+</script>
+</body>
+</html>
