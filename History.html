@@ -1,0 +1,168 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System History Log</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; padding: 10px; }
+        .table-container { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; min-width: 800px; } 
+        th { background-color: #0056b3 !important; color: white !important; }
+        .filter-section select, .filter-section input { margin-bottom: 5px; }
+        .btn { width: 100%; margin-top: 5px; }
+.fixed-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 37px;
+    background-color: #0056b3;
+    color: white;
+    display: flex;
+   justify-content: center; /* Centers the title horizontally */
+    align-items: center;
+   
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Adjust the container margin so content isn't hidden under the fixed header */
+.container-fluid {
+    margin-top: 50px; 
+}
+        
+        /* Card Mode Styles */
+        #cardView { display: none; margin-top: 15px; }
+        .card-item { background: #fff; border-left: 5px solid #0056b3; border-radius: 4px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card-item div { font-size: 0.9rem; margin-bottom: 2px; }
+        .card-label { font-weight: bold; color: #555; display: inline-block; width: 80px; }
+        
+        @media (max-width: 600px) { .remarks-col { display: none; } }
+    </style>
+</head>
+<body>
+<header class="fixed-header">
+    <h2 class="m-0" style="font-size: 1.1rem;">Feeder History Log</h2>
+</header>
+
+<div class="container-fluid" style="margin-top: 60px;"> </div>
+    <div class="filter-section row g-2 align-items-center">
+    <div class="col-6 col-md-2"><select id="fPBS" class="form-select" onchange="updateFilters()"><option value="">All PBS</option></select></div>
+    <div class="col-6 col-md-2"><select id="fSUB" class="form-select" onchange="updateFilters()"><option value="">All SUBs</option></select></div>
+    <div class="col-6 col-md-2"><select id="fFed" class="form-select" onchange="updateFilters()"><option value="">All Feeders</option></select></div>
+    <div class="col-6 col-md-2">
+        <select id="fEvent" class="form-select" onchange="applyFilters()">
+            <option value="">All Events</option>
+            <option value="OFF → ON">OFF → ON</option>
+            <option value="ON → OFF">ON → OFF</option>
+        </select>
+    </div>
+    <div class="col-6 col-md-1"><input type="date" id="fStart" class="form-control" onchange="applyFilters()"></div>
+    <div class="col-6 col-md-1"><input type="date" id="fEnd" class="form-control" onchange="applyFilters()"></div>
+    
+    <div class="col-12 col-md-2 row g-1">
+        <div class="col-4"><button class="btn btn-outline-primary btn-sm w-100" onclick="toggleView()">View</button></div>
+        <div class="col-4"><button class="btn btn-success btn-sm w-100" onclick="exportToExcel()">Excel</button></div>
+        <div class="col-4"><button class="btn btn-danger btn-sm w-100" onclick="exportToPDF()">PDF</button></div>
+    </div>
+</div>
+
+    <div class="table-container">
+        <table class="table table-sm table-hover" id="logTable">
+            <thead>
+                <tr><th>Time</th><th>PBS</th><th>SUB</th><th>Feeder</th><th>Event</th><th>Status</th><th>Duration</th><th class="remarks-col">Remarks</th></tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+        </table>
+        <div id="cardView"></div>
+    </div>
+</div>
+
+<script>
+    const LOG_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec?mode=history_log";
+    let DATA = [];
+    let isTableView = true;
+
+    async function init() {
+        const res = await fetch(LOG_URL);
+        DATA = await res.json();
+        populatePBS();
+        applyFilters();
+    }
+
+    function toggleView() {
+        isTableView = !isTableView;
+        document.getElementById('logTable').style.display = isTableView ? 'table' : 'none';
+        document.getElementById('cardView').style.display = isTableView ? 'none' : 'block';
+        applyFilters();
+    }
+
+    function populatePBS() {
+        const pbs = [...new Set(DATA.map(r => r.PBS_ID))];
+        document.getElementById('fPBS').innerHTML = '<option value="">All PBS</option>' + pbs.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+
+    function updateFilters() {
+        const pbs = document.getElementById('fPBS').value;
+        const subSelect = document.getElementById('fSUB');
+        const fedSelect = document.getElementById('fFed');
+        const selectedSub = subSelect.value;
+        const selectedFed = fedSelect.value;
+
+        const subs = [...new Set(DATA.filter(r => !pbs || r.PBS_ID == pbs).map(r => r.SUB_ID))];
+        subSelect.innerHTML = '<option value="">All SUBs</option>' + subs.map(s => `<option value="${s}" ${s == selectedSub ? 'selected' : ''}>${s}</option>`).join('');
+        
+        const activeSub = subSelect.value;
+        const feds = [...new Set(DATA.filter(r => (!pbs || r.PBS_ID == pbs) && (!activeSub || r.SUB_ID == activeSub)).map(r => r.FeederID))];
+        fedSelect.innerHTML = '<option value="">All Feeders</option>' + feds.map(f => `<option value="${f}" ${f == selectedFed ? 'selected' : ''}>${f}</option>`).join('');
+        
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const pbs = document.getElementById('fPBS').value;
+        const sub = document.getElementById('fSUB').value;
+        const fed = document.getElementById('fFed').value;
+        const event = document.getElementById('fEvent').value;
+        const start = new Date(document.getElementById('fStart').value);
+        const end = new Date(document.getElementById('fEnd').value);
+
+        const filtered = DATA.filter(r => {
+            const date = new Date(r.Timestamp);
+            const durationInSeconds = Number(r.DurationSeconds) || 0;
+            return (!pbs || r.PBS_ID == pbs) && (!sub || r.SUB_ID == sub) && (!fed || r.FeederID == fed) && (!event || r.Event == event) && (isNaN(start) || date >= start) && (isNaN(end) || date <= end.setHours(23,59,59)) && (durationInSeconds > 300);
+        });
+        render(filtered);
+    }
+
+    function render(data) {
+        const reversedData = [...data].reverse();
+        if (isTableView) {
+            document.getElementById("logBody").innerHTML = reversedData.map(r => `<tr>
+                <td>${new Date(r.Timestamp).toLocaleString()}</td><td>${r.PBS_ID}</td><td>${r.SUB_ID}</td><td>${r.FeederID}</td>
+                <td>${r.Event || "N/A"}</td><td>${r.Status || "N/A"}</td><td>${(Number(r.DurationSeconds) / 60).toFixed(1)} min</td>
+                <td class="remarks-col">${r.Remarks || ""}</td></tr>`).join('');
+        } else {
+            document.getElementById("cardView").innerHTML = reversedData.map(r => `
+                <div class="card-item">
+                    <div><span class="card-label">Time:</span> ${new Date(r.Timestamp).toLocaleString()}</div>
+                    <div><span class="card-label">Location:</span> ${r.PBS_ID} / ${r.SUB_ID} / ${r.FeederID}</div>
+                    <div><span class="card-label">Event:</span> ${r.Event || "N/A"} (${r.Status || "N/A"})</div>
+                    <div><span class="card-label">Duration:</span> ${(Number(r.DurationSeconds) / 60).toFixed(1)} min</div>
+                    <div><span class="card-label">Remarks:</span> ${r.Remarks || "N/A"}</div>
+                </div>`).join('');
+        }
+    }
+
+    function exportToExcel() { XLSX.writeFile(XLSX.utils.table_to_book(document.getElementById('logTable')), "History_Log.xlsx"); }
+    function exportToPDF() { html2pdf().from(document.getElementById('logTable')).save('History_Log.pdf'); }
+    init();
+</script>
+</body>
+</html>

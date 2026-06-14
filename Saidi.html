@@ -1,0 +1,144 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reliability Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; padding: 20px; }
+        .filter-section { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .table-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .val-saifi { color: #0d6efd; font-weight: bold; }
+        .val-saidi { color: #dc3545; font-weight: bold; }
+        th { background-color: #212529 !important; color: white !important; white-space: nowrap; }
+       .fixed-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 32px;
+    background-color: #3498db;
+    color: white;
+    display: flex;
+   justify-content: center; /* Centers the title horizontally */
+    align-items: center;
+   
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Adjust the container margin so content isn't hidden under the fixed header */
+.container-fluid {
+    margin-top: 50px; 
+}
+ /* Card Mode Styles */
+        #card-container { display: none; margin-top: 10px; }
+        .data-card { background: #fff; border-left: 5px solid #212529; border-radius: 8px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+<header class="fixed-header">
+    <h2 class="m-0" style="font-size: 1.0rem;">SAIDI/SAIFI Report</h2>
+</header>
+    <div class="filter-section">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2"><label class="form-label small fw-bold">PBS</label><select id="pbsFilter" class="form-select form-select-sm" onchange="updateSubFilter()"><option value="all">All PBS</option></select></div>
+            <div class="col-6 col-md-2"><label class="form-label small fw-bold">SUB</label><select id="subFilter" class="form-select form-select-sm" onchange="applyFilters()"><option value="all">All SUBs</option></select></div>
+            <div class="col-6 col-md-2"><label class="form-label small fw-bold">Month</label><select id="monthFilter" class="form-select form-select-sm" onchange="applyFilters()"><option value="all">All Months</option></select></div>
+            <div class="col-6 col-md-6 row g-1">
+                <div class="col-4"><button class="btn btn-outline-dark btn-sm w-100" onclick="toggleView()">View</button></div>
+                <div class="col-4"><button class="btn btn-success btn-sm w-100" onclick="exportToExcel()">Excel</button></div>
+                <div class="col-4"><button class="btn btn-danger btn-sm w-100" onclick="exportToPDF()">PDF</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-content" class="table-container">
+        <table class="table table-sm table-hover" id="reportTable">
+            <thead><tr><th>Month</th><th>PBS</th><th>SUB</th><th>Feeder</th><th>Cust</th><th>Int</th><th>Mins</th><th>SAIFI</th><th>SAIDI</th></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+        <div id="card-container"></div>
+    </div>
+</div>
+
+<script>
+    const MASTER_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec?mode=history";
+    let MASTER_DATA = [];
+    let isTableView = true;
+
+    function toggleView() {
+        isTableView = !isTableView;
+        document.getElementById('reportTable').style.display = isTableView ? 'table' : 'none';
+        document.getElementById('card-container').style.display = isTableView ? 'none' : 'block';
+        applyFilters();
+    }
+
+    function formatMonth(value) {
+        if (!value) return "";
+        if (typeof value === "string" && /^\d{4}-\d{2}$/.test(value)) return value;
+        if (typeof value === "string" && value.includes("T")) {
+            const d = new Date(value);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        }
+        return value;
+    }
+
+    async function loadData() {
+        try {
+            const response = await fetch(MASTER_URL);
+            const data = await response.json();
+            MASTER_DATA = (data.reliability || []).map(r => ({ ...r, Month: formatMonth(r.Month) }));
+            const pbsSet = new Set(), monthSet = new Set();
+            MASTER_DATA.forEach(r => { pbsSet.add(r.PBS_ID); monthSet.add(r.Month); });
+            
+            const pbsSelect = document.getElementById('pbsFilter');
+            const monthSelect = document.getElementById('monthFilter');
+            pbsSet.forEach(p => pbsSelect.innerHTML += `<option value="${p}">${p}</option>`);
+            monthSet.forEach(m => monthSelect.innerHTML += `<option value="${m}">${m}</option>`);
+            applyFilters();
+        } catch (e) { document.getElementById('dashboard-content').innerHTML = "Error loading data."; }
+    }
+
+    function updateSubFilter() {
+        const pbsVal = document.getElementById('pbsFilter').value;
+        const subSelect = document.getElementById('subFilter');
+        subSelect.innerHTML = '<option value="all">All SUBs</option>';
+        const subs = new Set();
+        MASTER_DATA.forEach(item => { if (pbsVal === 'all' || String(item.PBS_ID) === pbsVal) subs.add(item.SUB_ID); });
+        subs.forEach(s => subSelect.innerHTML += `<option value="${s}">${s}</option>`);
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const pbsVal = document.getElementById('pbsFilter').value;
+        const subVal = document.getElementById('subFilter').value;
+        const monthVal = document.getElementById('monthFilter').value;
+        const filtered = MASTER_DATA.filter(item => (pbsVal === 'all' || String(item.PBS_ID) === pbsVal) && (subVal === 'all' || String(item.SUB_ID) === subVal) && (monthVal === 'all' || String(item.Month) === monthVal));
+        render(filtered);
+    }
+
+    function render(data) {
+        document.getElementById("tableBody").innerHTML = data.map(i => `<tr><td>${i.Month}</td><td>${i.PBS_ID}</td><td>${i.SUB_ID}</td><td>${i.FeederID}</td><td>${i.Customers}</td><td>${i.Interruptions}</td><td>${Number(i.OutageMin).toFixed(1)}</td><td class="val-saifi">${Number(i.SAIFI).toFixed(4)}</td><td class="val-saidi">${Number(i.SAIDI).toFixed(4)}</td></tr>`).join('');
+        document.getElementById("card-container").innerHTML = data.map(i => `
+            <div class="data-card">
+                <div class="card-row"><strong>${i.Month} | ${i.PBS_ID}</strong> <span>${i.SUB_ID}</span></div>
+                <div class="card-row">Feeder: ${i.FeederID}</div>
+                <div class="card-row">Cust: ${i.Customers} | Int: ${i.Interruptions}</div>
+                <div class="card-row">Mins: ${Number(i.OutageMin).toFixed(1)}</div>
+                <div class="card-row"><span class="val-saifi">SAIFI: ${Number(i.SAIFI).toFixed(4)}</span> <span class="val-saidi">SAIDI: ${Number(i.SAIDI).toFixed(4)}</span></div>
+            </div>`).join('');
+    }
+
+    function exportToExcel() { XLSX.writeFile(XLSX.utils.table_to_book(document.getElementById('reportTable')), "Reliability_Report.xlsx"); }
+    function exportToPDF() { html2pdf().from(document.getElementById('reportTable')).save('Reliability_Report.pdf'); }
+    loadData();
+</script>
+</body>
+</html>
