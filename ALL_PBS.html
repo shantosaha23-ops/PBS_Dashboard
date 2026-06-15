@@ -8,7 +8,17 @@
 <title>PBS Multi Substation Monitor</title>
 <style>
 :root{ --bg:#f5f7fb; --card:#ffffff; --primary:#2d9cff; --danger:#c62828; }
-body{ margin:0; padding:12px; font-family:system-ui,Roboto; background:var(--bg); color:#111; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+body {
+    margin: 0;
+    padding: 12px;
+    font-family: system-ui, Roboto;
+    background: var(--bg);
+    color: #111;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Changed from height to min-height */
+    overflow: auto;    /* Allows the page to scroll if it exceeds viewport */
+}
 h1{ text-align:center; font-size:22px; margin:0 0 14px 0; }
 #header-area { 
     flex-shrink: 0; 
@@ -42,7 +52,11 @@ h1{ text-align:center; font-size:22px; margin:0 0 14px 0; }
 }
 select{ padding:10px; border-radius:8px; border:1px solid #ccc; }
 #onlineStatus{ padding:6px 12px; border-radius:6px; color:#fff; background:#888; font-weight:700; }
-#container{ flex-grow: 1; overflow-y: auto; padding-right: 5px; }
+#container {
+    flex-grow: 1;
+    overflow-y: visible; /* Changed from auto/hidden to ensure it scrolls with the body */
+    padding-right: 5px;
+}
 .substationTitle{ margin-top:24px; margin-bottom:10px; font-size:20px; font-weight:700; color:#0d47a1; }
 .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
 .card{ background:var(--card); padding:12px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.08); cursor:pointer; user-select:none; }
