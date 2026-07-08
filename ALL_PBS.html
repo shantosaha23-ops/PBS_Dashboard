@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,27 +79,42 @@ function toggleDetails(id) {
   el.style.display = (el.style.display === "block") ? "none" : "block";
 }
 
-async function loadAll() {
-  try {
-    const [fb, trip, fault] = await Promise.all([
-      axios.get(FIREBASE_URL + "/.json"),
-      axios.get(SCRIPT_URL + "?mode=trip"),
-      axios.get(SCRIPT_URL + "?mode=fault")
-    ]);
-    firebaseData = fb.data || {};
-    sheetTripData = Array.isArray(trip.data) ? trip.data : (trip.data?.data || []);
-    window.allFaults = Array.isArray(fault.data) ? fault.data : (fault.data?.data || []);
-    buildFilters();
-    renderCards();
-    document.getElementById("onlineStatus").innerText = "ONLINE";
-    document.getElementById("onlineStatus").style.background = "#2ecc71";
-  } catch (err) {
-    console.error("Dashboard fetch error:", err);
-    document.getElementById("onlineStatus").innerText = "OFFLINE";
-    document.getElementById("onlineStatus").style.background = "#c62828";
-  }
-}
+// Keep track of loading state
+let isInitialLoad = true;
 
+async function loadAll() {
+    document.getElementById("onlineStatus").innerText = "Updating...";
+    
+    try {
+        // 1. Fetch everything in parallel again, but with better error handling
+        // Increase timeout for the Sheet requests as they are slower
+        const [fb, trip, fault] = await Promise.all([
+            axios.get(FIREBASE_URL + "/.json", { timeout: 15000 }),
+            axios.get(SCRIPT_URL + "?mode=trip", { timeout: 20000 }),
+            axios.get(SCRIPT_URL + "?mode=fault", { timeout: 20000 })
+        ]);
+
+        firebaseData = fb.data || {};
+        sheetTripData = Array.isArray(trip.data) ? trip.data : (trip.data?.data || []);
+        window.allFaults = Array.isArray(fault.data) ? fault.data : (fault.data?.data || []);
+
+        // 2. Build filters ONLY on initial load to avoid UI jumping
+        if (isInitialLoad) {
+            buildFilters();
+            isInitialLoad = false;
+        }
+
+        // 3. Render once everything is confirmed
+        renderCards();
+        
+        document.getElementById("onlineStatus").innerText = "ONLINE";
+        document.getElementById("onlineStatus").style.background = "#2ecc71";
+    } catch (err) {
+        console.error("Dashboard error:", err);
+        document.getElementById("onlineStatus").innerText = "OFFLINE (Retrying...)";
+        document.getElementById("onlineStatus").style.background = "#c62828";
+    }
+}
 function buildFilters() {
     const pbsFilter = document.getElementById("pbsFilter");
     const subFilter = document.getElementById("subFilter");
