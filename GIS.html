@@ -158,12 +158,20 @@
             } catch(e) { console.log("Firebase load error:", e); }
         }
 
-        function getFeederID(name) { 
-            return (name || "").toUpperCase().replace(/[^A-Z0-9]/g, "_").split("_").slice(0, 2).join("_"); 
+        // Returns an array of clean base feeder IDs if split by '/'
+        // e.g., "NG1-2B-6 / NG1-8H-6" -> ["NG1_2B", "NG1_8H"]
+        function getFeederIDs(name) {
+            if (!name) return [];
+            return name.split('/').map(part => {
+                const clean = part.toUpperCase().replace(/[^A-Z0-9-]/g, "_");
+                const segments = clean.split(/[-_]/).filter(Boolean);
+                // Keep up to the first 2 segments (e.g., NG1 and 2B)
+                return segments.slice(0, 2).join("_");
+            }).filter(Boolean);
         }
 
-        function findDevice(feederID) {
-            if (!feederID || !firebaseData) return null;
+        function findDevice(targetID) {
+            if (!targetID || !firebaseData) return null;
             for (const pbs in firebaseData) {
                 if (typeof firebaseData[pbs] !== 'object') continue;
                 for (const sub in firebaseData[pbs]) {
@@ -173,7 +181,8 @@
                         const d = devs[dev];
                         if (d) {
                             for (const k in d) {
-                                if (getFeederID(k) === feederID) return { parent: d, node: d[k] };
+                                const cleanKey = k.toUpperCase().replace(/[^A-Z0-9-]/g, "_").split(/[-_]/).filter(Boolean).slice(0, 2).join("_");
+                                if (cleanKey === targetID) return { parent: d, node: d[k] };
                             }
                         }
                     }
@@ -182,17 +191,38 @@
             return null;
         }
 
-        function isOnline(obj) {
-            if (!obj || !obj.parent) return false;
-            let hb = obj.parent.lastHeartbeat || obj.parent.heartbeat || obj.parent.status?.lastHeartbeat;
-            hb = Number(hb);
-            if (isNaN(hb)) return false;
-            if (hb < 1e12) hb *= 1000;
-            return (Date.now() - hb) <= 120000;
+        // Evaluate all sub-feeders found within a slash-separated string
+        function getFeederBundle(name) {
+            const ids = getFeederIDs(name);
+            let devices = [];
+            ids.forEach(id => {
+                const dev = findDevice(id);
+                devices.push({ id: id, device: dev });
+            });
+            return devices;
         }
 
-        function getTags(obj, id) { 
-            return obj && obj.node ? [{ name: id, status: obj.node.status }] : []; 
+        function isBundleOnline(bundle) {
+            if (!bundle.length) return false;
+            // Consider online if at least one circuit responds recently
+            return bundle.some(b => {
+                if (!b.device || !b.device.parent) return false;
+                let hb = b.device.parent.lastHeartbeat || b.device.parent.heartbeat || b.device.parent.status?.lastHeartbeat;
+                hb = Number(hb);
+                if (isNaN(hb)) return false;
+                if (hb < 1e12) hb *= 1000;
+                return (Date.now() - hb) <= 120000;
+            });
+        }
+
+        function getTags(bundle) {
+            let tags = [];
+            bundle.forEach(b => {
+                if (b.device && b.device.node) {
+                    tags.push({ name: b.id, status: b.device.node.status });
+                }
+            });
+            return tags;
         }
 
         function getColor(tags, online) {
@@ -206,9 +236,9 @@
             return off ? "red" : "Magenta";
         }
 
-        function buildPopup(props, feederID, online, tags) {
+        function buildPopup(props, nameStr, online, tags) {
             let html = `<div style="font-family:sans-serif;font-size:13px;min-width:220px;">
-                <div style="background:#1f2937;color:white;padding:8px;text-align:center;">${feederID}</div>
+                <div style="background:#1f2937;color:white;padding:8px;text-align:center;">${nameStr}</div>
                 <div style="text-align:center;margin:10px;"><span style="padding:4px 12px;border-radius:15px;color:white;background:${online ? '#22c55e' : '#ef4444'}">${online ? "ONLINE" : "OFFLINE"}</span></div>`;
             if (online && tags.length) {
                 html += `<div><b>Status</b><br>${tags.map(t => `${t.name}: <b>${t.status}</b>`).join("<br>")}</div>`;
@@ -230,8 +260,8 @@
                     pointToLayer: (f, latlng) => L.circleMarker(latlng, getMarkerOptions(f)),
                     onEachFeature: (f, l) => {
                         if (f.geometry.type === "Point") {
-                            const id = getFeederID(f.properties.name);
-                            l.bindPopup(buildPopup(f.properties, id, false, []));
+                            const nameStr = f.properties.name || "";
+                            l.bindPopup(buildPopup(f.properties, nameStr, false, []));
                         }
                     }
                 }).addTo(map);
@@ -239,26 +269,26 @@
                 geoJsonLayer.eachLayer(l => {
                     const f = l.feature;
                     if (!f) return;
-                    const id = getFeederID(f.properties.name);
-                    const d = findDevice(id);
-                    const online = isOnline(d);
-                    const tags = getTags(d, id);
+                    const nameStr = f.properties.name || "";
+                    const bundle = getFeederBundle(nameStr);
+                    const online = isBundleOnline(bundle);
+                    const tags = getTags(bundle);
                                     
                     if (l.setStyle) {
                         l.setStyle(l.options.radius ? getMarkerOptions(f) : getStyle(f));
                     }
                     if (f.geometry.type === "Point") {
-                        l.setPopupContent(buildPopup(f.properties, id, online, tags));
+                        l.setPopupContent(buildPopup(f.properties, nameStr, online, tags));
                     }
                 });
             }
         }
 
         function getStyle(f) {
-            const id = getFeederID(f.properties.name);
-            const d = findDevice(id);
-            const online = isOnline(d);
-            const tags = getTags(d, id);
+            const nameStr = f.properties.name || "";
+            const bundle = getFeederBundle(nameStr);
+            const online = isBundleOnline(bundle);
+            const tags = getTags(bundle);
             return { 
                 color: getColor(tags, online), 
                 weight: 4,
@@ -267,10 +297,10 @@
         }
 
         function getMarkerOptions(f) {
-            const id = getFeederID(f.properties.name);
-            const d = findDevice(id);
-            const online = isOnline(d);
-            const tags = getTags(d, id);
+            const nameStr = f.properties.name || "";
+            const bundle = getFeederBundle(nameStr);
+            const online = isBundleOnline(bundle);
+            const tags = getTags(bundle);
             return { 
                 radius: 6, 
                 color: getColor(tags, online), 
