@@ -40,9 +40,31 @@
     <!-- Leaflet LocateControl JS -->
     <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js" charset="utf-8"></script>
     <script>
-        const map = L.map('map').setView([24.7936, 88.9318], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                
+        // Define base map layers
+        const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        });
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community'
+        });
+
+        // Initialize map with standard layer active by default
+        const map = L.map('map', {
+            center: [24.7936, 88.9318],
+            zoom: 14,
+            layers: [standardLayer]
+        });
+
+        // Add Layer Control toggle box (Top Right)
+        const baseMaps = {
+            "Standard Map": standardLayer,
+            "Satellite View": satelliteLayer
+        };
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
         // Add "My Location" control
         const lc = L.control.locate({
             position: 'topleft',
