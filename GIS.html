@@ -196,14 +196,14 @@
         }
 
         function getColor(tags, online) {
-            if (!online) return "black";
+            if (!online) return "blue";
             let on = 0, off = 0;
             tags.forEach(t => { 
                 if (t.status === "ON") on++; 
                 if (t.status === "OFF") off++; 
             });
             if (on && off) return "orange";
-            return off ? "red" : "cyan";
+            return off ? "red" : "pink";
         }
 
         function buildPopup(props, feederID, online, tags) {
