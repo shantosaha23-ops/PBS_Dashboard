@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <title>GIS Feeder Dashboard</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <!-- Leaflet LocateControl CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.css" />
     <style>
         body { 
             margin: 0; 
@@ -25,10 +27,29 @@
 <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet LocateControl JS -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js" charset="utf-8"></script>
     <script>
         const map = L.map('map').setView([24.7936, 88.9318], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                 
+        // Add "My Location" control to the map with error handling fallback
+        const lc = L.control.locate({
+            position: 'topleft',
+            strings: {
+                title: "Show my location"
+            },
+            locateOptions: {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            },
+            showPopup: false,
+            onLocationError: function(err) {
+                alert("Location access failed: " + err.message + "\nPlease make sure GPS is turned on and browser permissions are allowed.");
+            }
+        }).addTo(map);
+
         const KML_URL = "https://raw.githubusercontent.com/shantosaha23-ops/gisdashboard/refs/heads/main/Naogaon_1_SS_Atribute.kml";
         const FIREBASE_URL = "https://allpbs-f3b0c-default-rtdb.asia-southeast1.firebasedatabase.app/.json";
                 
@@ -126,7 +147,7 @@
                 geoJsonLayer.eachLayer(l => {
                     const f = l.feature;
                     if (!f) return;
-                    const id = getFeederID(f.properties.name);
+                    const id = getFezedrID ? getFeederID(f.properties.name) : getFeederID(f.properties.name);
                     const d = findDevice(id);
                     const online = isOnline(d);
                     const tags = getTags(d, id);
