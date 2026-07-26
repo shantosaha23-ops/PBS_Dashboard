@@ -5,17 +5,10 @@
     <meta charset="utf-8" />
     <title>GIS Feeder Dashboard</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <!-- Leaflet LocateControl CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.css" />
     <style>
         body { margin: 0; }
         #map { height: 100vh; width: 100%; }
-        @keyframes blink { 
-            0% { opacity: 1; } 
-            50% { opacity: 0.2; } 
-            100% { opacity: 1; } 
-        }
-        .blink-line { animation: blink 1s linear infinite; }
         .measure-btn {
             background: white;
             border: 2px solid rgba(0,0,0,0.2);
@@ -37,10 +30,8 @@
 <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet LocateControl JS -->
     <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js" charset="utf-8"></script>
     <script>
-        // Define base map layers
         const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap'
@@ -48,32 +39,24 @@
 
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
-            attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community'
+            attribution: 'Tiles © Esri'
         });
 
-        // Initialize map with standard layer active by default
         const map = L.map('map', {
             center: [24.7936, 88.9318],
             zoom: 14,
             layers: [standardLayer]
         });
 
-        // Add Layer Control toggle box (Top Right)
-        const baseMaps = {
-            "Standard Map": standardLayer,
-            "Satellite View": satelliteLayer
-        };
-        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+        L.control.layers({ "Standard Map": standardLayer, "Satellite View": satelliteLayer }, null, { position: 'topright' }).addTo(map);
 
-        // Add "My Location" control
-        const lc = L.control.locate({
+        L.control.locate({
             position: 'topleft',
             strings: { title: "Show my location" },
             locateOptions: { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
             showPopup: false
         }).addTo(map);
 
-        // Native Distance Measurement Control State
         let measureActive = false;
         let measurePoints = [];
         let measureMarkers = [];
@@ -86,7 +69,6 @@
                 const container = L.DomUtil.create('div', 'leaflet-bar');
                 const btn = L.DomUtil.create('button', 'measure-btn', container);
                 btn.innerHTML = '📏 Measure';
-                
                 L.DomEvent.disableClickPropagation(btn);
                 L.DomEvent.on(btn, 'click', function() {
                     measureActive = !measureActive;
@@ -105,10 +87,8 @@
         });
         map.addControl(new MeasureControl());
 
-        // Handle map clicks for measurement
         map.on('click', function(e) {
             if (!measureActive) return;
-
             measurePoints.push(e.latlng);
             const marker = L.circleMarker(e.latlng, { radius: 5, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 1 }).addTo(map);
             measureMarkers.push(marker);
@@ -127,11 +107,7 @@
                     Math.round(totalDistance) + ' meters';
 
                 measurePopup.setLatLng(e.latlng)
-                    .setContent(`<b>Distance:</b> ${distText}<br><small style="color:gray;">Tap map to add points or toggle button to clear</small>`)
-                    .openOn(map);
-            } else {
-                measurePopup.setLatLng(e.latlng)
-                    .setContent(`<b>Start Point Set</b><br><small style="color:gray;">Tap next point</small>`)
+                    .setContent(`<b>Distance:</b> ${distText}`)
                     .openOn(map);
             }
         });
@@ -146,7 +122,7 @@
 
         const KML_URL = "https://raw.githubusercontent.com/shantosaha23-ops/gisdashboard/refs/heads/main/Naogaon_1_SS_Atribute.kml";
         const FIREBASE_URL = "https://allpbs-f3b0c-default-rtdb.asia-southeast1.firebasedatabase.app/.json";
-                
+                        
         let firebaseData = {};
         let geoJsonLayer = null;
         let kmlData = null;
@@ -158,14 +134,11 @@
             } catch(e) { console.log("Firebase load error:", e); }
         }
 
-        // Returns an array of clean base feeder IDs if split by '/'
-        // e.g., "NG1-2B-6 / NG1-8H-6" -> ["NG1_2B", "NG1_8H"]
         function getFeederIDs(name) {
             if (!name) return [];
             return name.split('/').map(part => {
                 const clean = part.toUpperCase().replace(/[^A-Z0-9-]/g, "_");
                 const segments = clean.split(/[-_]/).filter(Boolean);
-                // Keep up to the first 2 segments (e.g., NG1 and 2B)
                 return segments.slice(0, 2).join("_");
             }).filter(Boolean);
         }
@@ -191,7 +164,6 @@
             return null;
         }
 
-        // Evaluate all sub-feeders found within a slash-separated string
         function getFeederBundle(name) {
             const ids = getFeederIDs(name);
             let devices = [];
@@ -204,7 +176,6 @@
 
         function isBundleOnline(bundle) {
             if (!bundle.length) return false;
-            // Consider online if at least one circuit responds recently
             return bundle.some(b => {
                 if (!b.device || !b.device.parent) return false;
                 let hb = b.device.parent.lastHeartbeat || b.device.parent.heartbeat || b.device.parent.status?.lastHeartbeat;
@@ -273,7 +244,7 @@
                     const bundle = getFeederBundle(nameStr);
                     const online = isBundleOnline(bundle);
                     const tags = getTags(bundle);
-                                    
+                                        
                     if (l.setStyle) {
                         l.setStyle(l.options.radius ? getMarkerOptions(f) : getStyle(f));
                     }
@@ -289,11 +260,7 @@
             const bundle = getFeederBundle(nameStr);
             const online = isBundleOnline(bundle);
             const tags = getTags(bundle);
-            return { 
-                color: getColor(tags, online), 
-                weight: 4,
-                className: (online && tags.some(t => t.status === "OFF")) ? "blink-line" : ""
-            };
+            return { color: getColor(tags, online), weight: 4 };
         }
 
         function getMarkerOptions(f) {
@@ -301,48 +268,52 @@
             const bundle = getFeederBundle(nameStr);
             const online = isBundleOnline(bundle);
             const tags = getTags(bundle);
-            return { 
-                radius: 6, 
-                color: getColor(tags, online), 
-                fillOpacity: 0.9,
-                className: (online && tags.some(t => t.status === "OFF")) ? "blink-line" : ""
-            };
+            return { radius: 6, color: getColor(tags, online), fillOpacity: 0.9 };
         }
 
         async function init() {
-            const xmlResponse = await fetch(KML_URL);
-            const xmlText = await xmlResponse.text();
-            const xml = new DOMParser().parseFromString(xmlText, "text/xml");
-            
-            kmlData = Array.from(xml.getElementsByTagName("Placemark")).map(pm => {
-                const coord = pm.getElementsByTagName("coordinates")[0]?.textContent;
-                if (!coord) return null;
+            try {
+                const xmlResponse = await fetch(KML_URL);
+                if (!xmlResponse.ok) throw new Error("Could not fetch KML file.");
+                const xmlText = await xmlResponse.text();
+                const xml = new DOMParser().parseFromString(xmlText, "text/xml");
                 
-                const props = { 
-                    name: pm.getElementsByTagName("name")[0]?.textContent || "" 
-                };
-                
-                Array.from(pm.querySelectorAll("Data, SimpleData")).forEach(d => {
-                    const name = d.getAttribute("name");
-                    const val = d.querySelector("value") ? d.querySelector("value").textContent : d.textContent;
-                    if (name) props[name] = val;
-                });
-                
-                const coords = coord.trim().split(/\s+/).map(p => p.split(",").map(Number));
-                return { 
-                    type: "Feature", 
-                    properties: props, 
-                    geometry: coords.length === 1 ? { type: "Point", coordinates: coords[0] } : { type: "LineString", coordinates: coords } 
-                };
-            }).filter(Boolean);
-            
-            await loadFirebase();
-            updateMap();
-            
-            setInterval(async () => { 
-                await loadFirebase(); 
-                updateMap(); 
-            }, 30000);
+                kmlData = Array.from(xml.getElementsByTagName("Placemark")).map(pm => {
+                    const coordEl = pm.getElementsByTagName("coordinates")[0];
+                    if (!coordEl || !coordEl.textContent) return null;
+                    
+                    const props = { name: pm.getElementsByTagName("name")[0]?.textContent || "" };
+                    Array.from(pm.querySelectorAll("Data, SimpleData")).forEach(d => {
+                        const name = d.getAttribute("name");
+                        const val = d.querySelector("value") ? d.querySelector("value").textContent : d.textContent;
+                        if (name) props[name] = val;
+                    });
+
+                    // GeoJSON format requires [longitude, latitude] order
+                    const coords = coordEl.textContent.trim().split(/\s+/).map(p => {
+                        return p.split(",").map(Number);
+                    }).filter(c => !isNaN(c[0]) && !isNaN(c[1]));
+
+                    if (coords.length === 0) return null;
+
+                    return { 
+                        type: "Feature", 
+                        properties: props, 
+                        geometry: coords.length === 1 ? { type: "Point", coordinates: coords[0] } : { type: "LineString", coordinates: coords } 
+                    };
+                }).filter(Boolean);
+
+                await loadFirebase();
+                updateMap();
+
+                setInterval(async () => { 
+                    await loadFirebase(); 
+                    updateMap(); 
+                }, 30000);
+
+            } catch (err) {
+                console.error("Initialization failed:", err);
+            }
         }
 
         init();
