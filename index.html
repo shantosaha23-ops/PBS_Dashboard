@@ -738,19 +738,25 @@
             dispatchVerificationCode(user.email, null, "");
         };
 
-        // CHANGE PASSWORD PROCESS
-        window.startChangePasswordProcess = function() {
-            if (!currentUser) return;
-            pendingUserPayload = currentUser;
-            verificationPurpose = 'change';
-            window.toggleMenu(); 
-            window.openAuthModal();
-            document.getElementById('auth-tabs-header').classList.add('hidden');
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('register-form').classList.add('hidden');
-            document.getElementById('new-pwd-fields').classList.remove('hidden');
-            dispatchVerificationCode(currentUser.email, null, "");
-        };
+       window.startChangePasswordProcess = function() {
+    if (!currentUser) return;
+
+    // Prompt confirmation dialog before triggering email OTP
+    const confirmSend = confirm(`A verification code will be sent to your registered Gmail (${currentUser.email}). Do you want to proceed?`);
+    if (!confirmSend) {
+        return; // Cancel action if user clicks 'Cancel'
+    }
+
+    pendingUserPayload = currentUser;
+    verificationPurpose = 'change';
+    window.toggleMenu(); 
+    window.openAuthModal();
+    document.getElementById('auth-tabs-header').classList.add('hidden');
+    document.getElementById('login-form').classList.add('hidden');
+    document.getElementById('register-form').classList.add('hidden');
+    document.getElementById('new-pwd-fields').classList.remove('hidden');
+    dispatchVerificationCode(currentUser.email, null, "");
+};
 
         // APP UPDATE TRIGGER (MIT APP INVENTOR ONLY)
         window.handleAppUpdate = function() {
