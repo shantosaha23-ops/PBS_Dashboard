@@ -1,166 +1,405 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System History Log</title>
+    <title>Feeder History Log</title>
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- SheetJS (Excel) & html2pdf (PDF Export) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <style>
-        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; padding: 10px; }
-        .table-container { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        table { width: 100%; min-width: 800px; } 
-        th { background-color: #0056b3 !important; color: white !important; }
-        .filter-section select, .filter-section input { margin-bottom: 5px; }
-        .btn { width: 100%; margin-top: 5px; }
-.fixed-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 37px;
-    background-color: #0056b3;
-    color: white;
-    display: flex;
-   justify-content: center; /* Centers the title horizontally */
-    align-items: center;
-   
-    z-index: 1000;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
 
-/* Adjust the container margin so content isn't hidden under the fixed header */
-.container-fluid {
-    margin-top: 50px; 
-}
-        
-        /* Card Mode Styles */
-        #cardView { display: none; margin-top: 15px; }
-        .card-item { background: #fff; border-left: 5px solid #0056b3; border-radius: 4px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .card-item div { font-size: 0.9rem; margin-bottom: 2px; }
-        .card-label { font-weight: bold; color: #555; display: inline-block; width: 80px; }
-        
-        @media (max-width: 600px) { .remarks-col { display: none; } }
+    <style>
+        :root {
+            --primary-blue: #0056b3;
+            --bg-light: #f8f9fa;
+        }
+
+        body { 
+            background: var(--bg-light); 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            padding: 10px; 
+            color: #212529;
+        }
+
+        .fixed-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 42px;
+            background-color: var(--primary-blue);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .main-container {
+            margin-top: 52px;
+        }
+
+        .filter-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
+            margin-bottom: 12px;
+        }
+
+        .table-container { 
+            background: white; 
+            padding: 12px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08); 
+            overflow-x: auto; 
+            -webkit-overflow-scrolling: touch; 
+        }
+
+        table { 
+            width: 100%; 
+            min-width: 800px; 
+            margin-bottom: 0;
+        } 
+
+        th { 
+            background-color: var(--primary-blue) !important; 
+            color: white !important; 
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 8px;
+        }
+
+        td {
+            font-size: 0.88rem;
+            padding: 8px;
+            vertical-align: middle;
+        }
+
+        /* Card View Styles */
+        #cardView { 
+            display: none; 
+            margin-top: 10px; 
+        }
+
+        .card-item { 
+            background: #fff; 
+            border-left: 5px solid var(--primary-blue); 
+            border-radius: 6px; 
+            padding: 12px; 
+            margin-bottom: 10px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06); 
+            border-top: 1px solid #e9ecef;
+            border-right: 1px solid #e9ecef;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .card-item div { 
+            font-size: 0.88rem; 
+            margin-bottom: 3px; 
+        }
+
+        .card-label { 
+            font-weight: bold; 
+            color: #6c757d; 
+            display: inline-block; 
+            width: 90px; 
+        }
+
+        .badge-event {
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .event-off {
+            background-color: #ffebe9;
+            color: #cf222e;
+        }
+
+        .event-on {
+            background-color: #dafbe1;
+            color: #1a7f37;
+        }
+
+        @media (max-width: 600px) { 
+            .remarks-col { display: none; } 
+        }
     </style>
 </head>
 <body>
-<header class="fixed-header">
-    <h2 class="m-0" style="font-size: 1.1rem;">Feeder History Log</h2>
-</header>
 
-<div class="container-fluid" style="margin-top: 60px;"> </div>
-    <div class="filter-section row g-2 align-items-center">
-    <div class="col-6 col-md-2"><select id="fPBS" class="form-select" onchange="updateFilters()"><option value="">All PBS</option></select></div>
-    <div class="col-6 col-md-2"><select id="fSUB" class="form-select" onchange="updateFilters()"><option value="">All SUBs</option></select></div>
-    <div class="col-6 col-md-2"><select id="fFed" class="form-select" onchange="updateFilters()"><option value="">All Feeders</option></select></div>
-    <div class="col-6 col-md-2">
-        <select id="fEvent" class="form-select" onchange="applyFilters()">
-            <option value="">All Events</option>
-            <option value="OFF → ON">OFF → ON</option>
-            <option value="ON → OFF">ON → OFF</option>
-        </select>
+    <header class="fixed-header">
+        <h2 class="m-0" style="font-size: 1.1rem; font-weight: 600;">
+            <i class="fa-solid fa-clock-rotate-left me-2"></i>Feeder History Log
+        </h2>
+    </header>
+
+    <div class="main-container">
+        <!-- Filters Panel -->
+        <div class="filter-card">
+            <div class="row g-2 align-items-center">
+                <div class="col-6 col-md-2">
+                    <select id="fPBS" class="form-select form-select-sm" onchange="updateFilters()">
+                        <option value="">All PBS</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select id="fSUB" class="form-select form-select-sm" onchange="updateFilters()">
+                        <option value="">All SUBs</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select id="fFed" class="form-select form-select-sm" onchange="updateFilters()">
+                        <option value="">All Feeders</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select id="fEvent" class="form-select form-select-sm" onchange="applyFilters()">
+                        <option value="">All Events</option>
+                        <option value="OFF → ON">OFF → ON</option>
+                        <option value="ON → OFF">ON → OFF</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-1">
+                    <input type="date" id="fStart" class="form-control form-control-sm" title="Start Date" onchange="applyFilters()">
+                </div>
+                <div class="col-6 col-md-1">
+                    <input type="date" id="fEnd" class="form-control form-control-sm" title="End Date" onchange="applyFilters()">
+                </div>
+                
+                <div class="col-12 col-md-2 row g-1">
+                    <div class="col-4">
+                        <button class="btn btn-outline-primary btn-sm w-100 fw-semibold" onclick="toggleView()" title="Toggle View">
+                            <i class="fa-solid fa-list-check"></i> View
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-success btn-sm w-100 fw-semibold" onclick="exportToExcel()" title="Export Excel">
+                            <i class="fa-solid fa-file-excel"></i>
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-danger btn-sm w-100 fw-semibold" onclick="exportToPDF()" title="Export PDF">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Display Section -->
+        <div class="table-container" id="printableContainer">
+            <table class="table table-sm table-hover align-middle" id="logTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>PBS</th>
+                        <th>SUB</th>
+                        <th>Feeder</th>
+                        <th>Event</th>
+                        <th>Status</th>
+                        <th>Duration</th>
+                        <th class="remarks-col">Remarks</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading history records 
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div id="cardView"></div>
+        </div>
     </div>
-    <div class="col-6 col-md-1"><input type="date" id="fStart" class="form-control" onchange="applyFilters()"></div>
-    <div class="col-6 col-md-1"><input type="date" id="fEnd" class="form-control" onchange="applyFilters()"></div>
-    
-    <div class="col-12 col-md-2 row g-1">
-        <div class="col-4"><button class="btn btn-outline-primary btn-sm w-100" onclick="toggleView()">View</button></div>
-        <div class="col-4"><button class="btn btn-success btn-sm w-100" onclick="exportToExcel()">Excel</button></div>
-        <div class="col-4"><button class="btn btn-danger btn-sm w-100" onclick="exportToPDF()">PDF</button></div>
-    </div>
-</div>
 
-    <div class="table-container">
-        <table class="table table-sm table-hover" id="logTable">
-            <thead>
-                <tr><th>Time</th><th>PBS</th><th>SUB</th><th>Feeder</th><th>Event</th><th>Status</th><th>Duration</th><th class="remarks-col">Remarks</th></tr>
-            </thead>
-            <tbody id="logBody"></tbody>
-        </table>
-        <div id="cardView"></div>
-    </div>
-</div>
+    <script>
+        const LOG_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec?mode=history_log";
+        let DATA = [];
+        let isTableView = true;
 
-<script>
-    const LOG_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec?mode=history_log";
-    let DATA = [];
-    let isTableView = true;
+        async function init() {
+            try {
+                const res = await fetch(LOG_URL);
+                const rawJson = await res.json();
+                
+                // Flexibly parse payload whether direct array or wrapped object
+                let rawList = [];
+                if (Array.isArray(rawJson)) {
+                    rawList = rawJson;
+                } else if (rawJson && Array.isArray(rawJson.fault)) {
+                    rawList = rawJson.fault;
+                } else if (rawJson && Array.isArray(rawJson.trip)) {
+                    rawList = rawJson.trip;
+                } else if (rawJson && Array.isArray(rawJson.data)) {
+                    rawList = rawJson.data;
+                }
 
-    async function init() {
-        const res = await fetch(LOG_URL);
-        DATA = await res.json();
-        populatePBS();
-        applyFilters();
-    }
+                // Standardize field mappings
+                DATA = rawList.map(r => ({
+                    Timestamp: r.Timestamp || r.timestamp || r.Time || r.time || "",
+                    PBS_ID: r.PBS_ID || r.pbs || "",
+                    SUB_ID: r.SUB_ID || r.sub || "",
+                    FeederID: r.FeederID || r.feeder || r.dev || "",
+                    Event: r.Event || r.event || "",
+                    Status: r.Status || r.status || "",
+                    DurationSeconds: Number(r.DurationSeconds || r.durationSeconds || r.Duration || r.duration || 0),
+                    Remarks: r.Remarks || r.remarks || ""
+                }));
 
-    function toggleView() {
-        isTableView = !isTableView;
-        document.getElementById('logTable').style.display = isTableView ? 'table' : 'none';
-        document.getElementById('cardView').style.display = isTableView ? 'none' : 'block';
-        applyFilters();
-    }
+                if (DATA.length === 0) {
+                    document.getElementById('logBody').innerHTML = '<tr><td colspan="8" class="text-center text-warning fw-bold py-3">No log records found.</td></tr>';
+                    return;
+                }
 
-    function populatePBS() {
-        const pbs = [...new Set(DATA.map(r => r.PBS_ID))];
-        document.getElementById('fPBS').innerHTML = '<option value="">All PBS</option>' + pbs.map(p => `<option value="${p}">${p}</option>`).join('');
-    }
-
-    function updateFilters() {
-        const pbs = document.getElementById('fPBS').value;
-        const subSelect = document.getElementById('fSUB');
-        const fedSelect = document.getElementById('fFed');
-        const selectedSub = subSelect.value;
-        const selectedFed = fedSelect.value;
-
-        const subs = [...new Set(DATA.filter(r => !pbs || r.PBS_ID == pbs).map(r => r.SUB_ID))];
-        subSelect.innerHTML = '<option value="">All SUBs</option>' + subs.map(s => `<option value="${s}" ${s == selectedSub ? 'selected' : ''}>${s}</option>`).join('');
-        
-        const activeSub = subSelect.value;
-        const feds = [...new Set(DATA.filter(r => (!pbs || r.PBS_ID == pbs) && (!activeSub || r.SUB_ID == activeSub)).map(r => r.FeederID))];
-        fedSelect.innerHTML = '<option value="">All Feeders</option>' + feds.map(f => `<option value="${f}" ${f == selectedFed ? 'selected' : ''}>${f}</option>`).join('');
-        
-        applyFilters();
-    }
-
-    function applyFilters() {
-        const pbs = document.getElementById('fPBS').value;
-        const sub = document.getElementById('fSUB').value;
-        const fed = document.getElementById('fFed').value;
-        const event = document.getElementById('fEvent').value;
-        const start = new Date(document.getElementById('fStart').value);
-        const end = new Date(document.getElementById('fEnd').value);
-
-        const filtered = DATA.filter(r => {
-            const date = new Date(r.Timestamp);
-            const durationInSeconds = Number(r.DurationSeconds) || 0;
-            return (!pbs || r.PBS_ID == pbs) && (!sub || r.SUB_ID == sub) && (!fed || r.FeederID == fed) && (!event || r.Event == event) && (isNaN(start) || date >= start) && (isNaN(end) || date <= end.setHours(23,59,59)) && (durationInSeconds > 300);
-        });
-        render(filtered);
-    }
-
-    function render(data) {
-        const reversedData = [...data].reverse();
-        if (isTableView) {
-            document.getElementById("logBody").innerHTML = reversedData.map(r => `<tr>
-                <td>${new Date(r.Timestamp).toLocaleString()}</td><td>${r.PBS_ID}</td><td>${r.SUB_ID}</td><td>${r.FeederID}</td>
-                <td>${r.Event || "N/A"}</td><td>${r.Status || "N/A"}</td><td>${(Number(r.DurationSeconds) / 60).toFixed(1)} min</td>
-                <td class="remarks-col">${r.Remarks || ""}</td></tr>`).join('');
-        } else {
-            document.getElementById("cardView").innerHTML = reversedData.map(r => `
-                <div class="card-item">
-                    <div><span class="card-label">Time:</span> ${new Date(r.Timestamp).toLocaleString()}</div>
-                    <div><span class="card-label">Location:</span> ${r.PBS_ID} / ${r.SUB_ID} / ${r.FeederID}</div>
-                    <div><span class="card-label">Event:</span> ${r.Event || "N/A"} (${r.Status || "N/A"})</div>
-                    <div><span class="card-label">Duration:</span> ${(Number(r.DurationSeconds) / 60).toFixed(1)} min</div>
-                    <div><span class="card-label">Remarks:</span> ${r.Remarks || "N/A"}</div>
-                </div>`).join('');
+                populatePBS();
+                applyFilters();
+            } catch (e) {
+                console.error("Fetch Error:", e);
+                document.getElementById('logBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger fw-bold py-3">Error fetching history log. Please verify Apps Script deployment.</td></tr>';
+            }
         }
-    }
 
-    function exportToExcel() { XLSX.writeFile(XLSX.utils.table_to_book(document.getElementById('logTable')), "History_Log.xlsx"); }
-    function exportToPDF() { html2pdf().from(document.getElementById('logTable')).save('History_Log.pdf'); }
-    init();
-</script>
+        function toggleView() {
+            isTableView = !isTableView;
+            document.getElementById('logTable').style.display = isTableView ? 'table' : 'none';
+            document.getElementById('cardView').style.display = isTableView ? 'none' : 'block';
+            applyFilters();
+        }
+
+        function populatePBS() {
+            const pbsList = [...new Set(DATA.map(r => r.PBS_ID).filter(Boolean))];
+            document.getElementById('fPBS').innerHTML = '<option value="">All PBS</option>' + pbsList.map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+
+        function updateFilters() {
+            const pbs = document.getElementById('fPBS').value;
+            const subSelect = document.getElementById('fSUB');
+            const fedSelect = document.getElementById('fFed');
+            const selectedSub = subSelect.value;
+            const selectedFed = fedSelect.value;
+
+            const subs = [...new Set(DATA.filter(r => !pbs || r.PBS_ID == pbs).map(r => r.SUB_ID).filter(Boolean))];
+            subSelect.innerHTML = '<option value="">All SUBs</option>' + subs.map(s => `<option value="${s}" ${s == selectedSub ? 'selected' : ''}>${s}</option>`).join('');
+            
+            const activeSub = subSelect.value;
+            const feds = [...new Set(DATA.filter(r => (!pbs || r.PBS_ID == pbs) && (!activeSub || r.SUB_ID == activeSub)).map(r => r.FeederID).filter(Boolean))];
+            fedSelect.innerHTML = '<option value="">All Feeders</option>' + feds.map(f => `<option value="${f}" ${f == selectedFed ? 'selected' : ''}>${f}</option>`).join('');
+            
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const pbs = document.getElementById('fPBS').value;
+            const sub = document.getElementById('fSUB').value;
+            const fed = document.getElementById('fFed').value;
+            const event = document.getElementById('fEvent').value;
+            
+            const startVal = document.getElementById('fStart').value;
+            const endVal = document.getElementById('fEnd').value;
+            
+            const start = startVal ? new Date(startVal) : null;
+            const end = endVal ? new Date(endVal) : null;
+            if (end) end.setHours(23, 59, 59, 999);
+
+            const filtered = DATA.filter(r => {
+                const date = new Date(r.Timestamp);
+                const durationInSeconds = Number(r.DurationSeconds) || 0;
+
+                const matchesPbs = !pbs || r.PBS_ID == pbs;
+                const matchesSub = !sub || r.SUB_ID == sub;
+                const matchesFed = !fed || r.FeederID == fed;
+                const matchesEvent = !event || r.Event == event;
+                const matchesStart = !start || (date >= start);
+                const matchesEnd = !end || (date <= end);
+                const matchesMinDuration = durationInSeconds > 300; // Exclude brief outages < 5 mins
+
+                return matchesPbs && matchesSub && matchesFed && matchesEvent && matchesStart && matchesEnd && matchesMinDuration;
+            });
+
+            render(filtered);
+        }
+
+        function render(data) {
+            const reversedData = [...data].reverse();
+
+            if (isTableView) {
+                if (reversedData.length === 0) {
+                    document.getElementById("logBody").innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No events matching selected filters.</td></tr>';
+                    return;
+                }
+
+                document.getElementById("logBody").innerHTML = reversedData.map(r => {
+                    const timeStr = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : "N/A";
+                    const mins = (Number(r.DurationSeconds) / 60).toFixed(1);
+                    const eventClass = r.Event.includes("OFF") ? "event-off" : "event-on";
+
+                    return `<tr>
+                        <td>${timeStr}</td>
+                        <td><strong>${r.PBS_ID}</strong></td>
+                        <td>${r.SUB_ID}</td>
+                        <td>${r.FeederID}</td>
+                        <td><span class="badge-event ${eventClass}">${r.Event || "N/A"}</span></td>
+                        <td>${r.Status || "N/A"}</td>
+                        <td class="fw-bold">${mins} min</td>
+                        <td class="remarks-col">${r.Remarks || ""}</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                if (reversedData.length === 0) {
+                    document.getElementById("cardView").innerHTML = '<div class="text-center text-muted py-3">No events matching selected filters.</div>';
+                    return;
+                }
+
+                document.getElementById("cardView").innerHTML = reversedData.map(r => {
+                    const timeStr = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : "N/A";
+                    const mins = (Number(r.DurationSeconds) / 60).toFixed(1);
+
+                    return `
+                    <div class="card-item">
+                        <div><span class="card-label">Time:</span> ${timeStr}</div>
+                        <div><span class="card-label">Location:</span> ${r.PBS_ID} / ${r.SUB_ID} / <strong>${r.FeederID}</strong></div>
+                        <div><span class="card-label">Event:</span> <strong>${r.Event || "N/A"}</strong> (${r.Status || "N/A"})</div>
+                        <div><span class="card-label">Duration:</span> ${mins} min</div>
+                        <div><span class="card-label">Remarks:</span> ${r.Remarks || "N/A"}</div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        function exportToExcel() { 
+            const table = document.getElementById('logTable');
+            const wb = XLSX.utils.table_to_book(table, { sheet: "Feeder History Log" });
+            XLSX.writeFile(wb, `Feeder_History_Log_${new Date().toISOString().slice(0,10)}.xlsx`); 
+        }
+
+        function exportToPDF() { 
+            const element = document.getElementById('printableContainer');
+            const opt = {
+                margin:       [10, 10, 10, 10],
+                filename:     `Feeder_History_Log_${new Date().toISOString().slice(0,10)}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+
+            html2pdf().set(opt).from(element).save(); 
+        }
+
+        // Initialize dashboard
+        init();
+    </script>
 </body>
 </html>
