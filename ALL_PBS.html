@@ -5,6 +5,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>PBS Multi Substation Monitor</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <style>
         :root{ --bg:#f5f7fb; --card:#ffffff; --primary:#2d9cff; --danger:#c62828; }
         body{ margin:0; padding:12px; font-family:system-ui,Roboto; background:var(--bg); color:#111; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
@@ -80,7 +83,6 @@ function toggleDetails(id) {
   if(el) el.style.display = (el.style.display === "block") ? "none" : "block";
 }
 
-// Fetch helper with retry logic for resilient connections
 async function fetchWithRetry(url, options = {}, retries = 2, delay = 1000) {
   try {
     return await axios.get(url, options);
@@ -91,24 +93,15 @@ async function fetchWithRetry(url, options = {}, retries = 2, delay = 1000) {
   }
 }
 
-async function loadAll() {
-    if (isFetching) return;
-    isFetching = true;
-
+// STAGE 1: Fast initial load (Firebase Realtime Data Only)
+async function loadRealtimeFirebase() {
     const statusEl = document.getElementById("onlineStatus");
-    statusEl.innerText = "Updating...";
+    statusEl.innerText = "Loading Live Data...";
     statusEl.style.background = "#f39c12";
 
     try {
-        // Parallel fetching: Firebase realtime status + Consolidated GAS Endpoint
-        const fbPromise = fetchWithRetry(FIREBASE_URL + "/.json", { timeout: 12000 });
-        const gasPromise = fetchWithRetry(SCRIPT_URL + "?mode=allData", { timeout: 25000 });
-
-        const [fb, gas] = await Promise.all([fbPromise, gasPromise]);
-
-        firebaseData = fb.data || {};
-        sheetTripData = gas.data?.trip || [];
-        window.allFaults = gas.data?.fault || [];
+        const fbRes = await fetchWithRetry(FIREBASE_URL + "/.json", { timeout: 8000 });
+        firebaseData = fbRes.data || {};
 
         if (isInitialLoad) {
             buildFilters();
@@ -116,16 +109,47 @@ async function loadAll() {
         }
 
         renderCards();
-        
-        statusEl.innerText = "ONLINE";
+
+        statusEl.innerText = "ONLINE (Live)";
         statusEl.style.background = "#2ecc71";
     } catch (err) {
-        console.error("Dashboard error:", err);
+        console.error("Firebase load error:", err);
         statusEl.innerText = "RETRYING...";
         statusEl.style.background = "#c62828";
-    } finally {
-        isFetching = false;
     }
+}
+
+// STAGE 2: Background hydration for historical trips & fault logs (Apps Script)
+async function loadAppsScriptData() {
+    const statusEl = document.getElementById("onlineStatus");
+    try {
+        const gasRes = await fetchWithRetry(SCRIPT_URL + "?mode=allData", { timeout: 20000 });
+        sheetTripData = gasRes.data?.trip || [];
+        window.allFaults = gasRes.data?.fault || [];
+
+        // Re-render UI with complete historical data
+        renderCards();
+
+        statusEl.innerText = "ONLINE (Synced)";
+        statusEl.style.background = "#2ecc71";
+    } catch (err) {
+        console.warn("Apps Script background fetch delayed or failed:", err);
+    }
+}
+
+// Main Boot Strategy
+async function loadAll() {
+    if (isFetching) return;
+    isFetching = true;
+
+    // 1. Instantly load & render Firebase live feeder statuses
+    await loadRealtimeFirebase();
+    isFetching = false;
+
+    // 2. Fetch history and fault logs from Apps Script in the background after a 1.5-second pause
+    setTimeout(() => {
+        loadAppsScriptData();
+    }, 1500);
 }
 
 function buildFilters() {
@@ -305,8 +329,8 @@ function renderCards() {
             </div>
             <div class="statusText">Status: ${displayStatus}</div>
             <div id="details_${id}" class="details-section">
-              <div class="trip">This Month: ${row?.thisMonthTrips || 0}</div>
-              <div class="trip">Last Month: ${row?.lastMonthTrips || 0}</div>
+              <div class="trip">This Month: ${row?.thisMonthTrips ?? "..."}</div>
+              <div class="trip">Last Month: ${row?.lastMonthTrips ?? "..."}</div>
               <div class="last">Last OFF: ${formatDisplayTime(row?.lastTripTime)}</div>
               <div class="last">Last ON: ${formatDisplayTime(row?.lastOnTime)}</div>
               <div class="last"><b>Area:</b> ${row?.area || "N/A"}</div>
@@ -335,7 +359,7 @@ async function saveFault(id) {
   try {
     const postUrl = `${SCRIPT_URL}?pbs=${encodeURIComponent(obj.pbs)}&sub=${encodeURIComponent(obj.sub)}&dev=${encodeURIComponent(obj.dev)}&relay=${encodeURIComponent(obj.relay)}&message=${encodeURIComponent(reason)}`;
     await fetch(postUrl, { method: "POST", mode: "no-cors" });
-    setTimeout(loadAll, 1000);
+    setTimeout(loadAppsScriptData, 1000);
   } catch (e) {
     alert("Failed to save fault reason. Please try again.");
   }
@@ -343,9 +367,12 @@ async function saveFault(id) {
 
 async function refreshDashboard() { await loadAll(); }
 
-// Initial boot and background refresh interval set to 30s for real-time responsiveness
+// Initial boot
 refreshDashboard();
-setInterval(refreshDashboard, 30000);
+
+// Periodic Background Updates (Firebase every 30s, Apps Script every 60s)
+setInterval(loadRealtimeFirebase, 30000);
+setInterval(loadAppsScriptData, 60000);
 </script>
 </body>
 </html>
