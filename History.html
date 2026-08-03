@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feeder History Log</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- SheetJS & html2pdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" async></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" async></script>
+
+    <style>
+        :root {
+            --primary-blue: #0056b3;
+            --bg-light: #f8f9fa;
+        }
+
+        body { 
+            background: var(--bg-light); 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            padding: 10px; 
+            color: #212529;
+        }
+
+        .fixed-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 42px;
+            background-color: var(--primary-blue);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .main-container {
+            margin-top: 52px;
+        }
+
+        .filter-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
+            margin-bottom: 12px;
+        }
+
+        .table-container { 
+            background: white; 
+            padding: 12px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08); 
+            overflow-x: auto; 
+            -webkit-overflow-scrolling: touch; 
+        }
+
+        table { 
+            width: 100%; 
+            min-width: 800px; 
+            margin-bottom: 0;
+        } 
+
+        th { 
+            background-color: var(--primary-blue) !important; 
+            color: white !important; 
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 8px;
+        }
+
+        td {
+            font-size: 0.88rem;
+            padding: 8px;
+            vertical-align: middle;
+        }
+
+        #cardView { 
+            display: none; 
+            margin-top: 10px; 
+        }
+
+        .card-item { 
+            background: #fff; 
+            border-left: 5px solid var(--primary-blue); 
+            border-radius: 6px; 
+            padding: 12px; 
+            margin-bottom: 10px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06); 
+            border: 1px solid #e9ecef;
+        }
+
+        .card-item div { 
+            font-size: 0.88rem; 
+            margin-bottom: 3px; 
+        }
+
+        .card-label { 
+            font-weight: bold; 
+            color: #6c757d; 
+            display: inline-block; 
+            width: 90px; 
+        }
+
+        .badge-event {
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .event-off {
+            background-color: #ffebe9;
+            color: #cf222e;
+        }
+
+        .event-on {
+            background-color: #dafbe1;
+            color: #1a7f37;
+        }
+
+        @media (max-width: 600px) { 
+            .remarks-col { display: none; } 
+        }
+    </style>
+</head>
+<body>
+
+    <header class="fixed-header">
+        <h2 class="m-0" style="font-size: 1.1rem; font-weight: 600;">
+            <i class="fa-solid fa-clock-rotate-left me-2"></i>Feeder History Log
+        </h2>
+    </header>
+
+    <div class="main-container">
+        <!-- Filters Panel -->
+        <div class="filter-card">
+            <div class="row g-2 align-items-center">
+                <div class="col-6 col-md-2">
+                    <select id="fPBS" class="form-select form-select-sm" onchange="onPbsChange()">
+                        <option value="">All PBS</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select id="fSUB" class="form-select form-select-sm" onchange="onSubChange()">
+                        <option value="">All SUBs</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select id="fFed" class="form-select form-select-sm">
+                        <option value="">All Feeders</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <select id="fEvent" class="form-select form-select-sm">
+                        <option value="">All Events</option>
+                        <option value="OFF → ON">OFF → ON</option>
+                        <option value="ON → OFF">ON → OFF</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-1">
+                    <input type="date" id="fStart" class="form-control form-control-sm" title="Start Date">
+                </div>
+                <div class="col-6 col-md-1">
+                    <input type="date" id="fEnd" class="form-control form-control-sm" title="End Date">
+                </div>
+                
+                <div class="col-12 col-md-2 row g-1">
+                    <div class="col-3">
+                        <button class="btn btn-primary btn-sm w-100 fw-semibold" onclick="fetchFilteredLogs()" title="Apply Filter">
+                            <i class="fa-solid fa-filter"></i>
+                        </button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-outline-primary btn-sm w-100 fw-semibold" onclick="toggleView()" title="Toggle View">
+                            <i class="fa-solid fa-list-check"></i>
+                        </button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-success btn-sm w-100 fw-semibold" onclick="exportToExcel()" title="Export Excel">
+                            <i class="fa-solid fa-file-excel"></i>
+                        </button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-danger btn-sm w-100 fw-semibold" onclick="exportToPDF()" title="Export PDF">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Display Section -->
+        <div class="table-container" id="printableContainer">
+            <table class="table table-sm table-hover align-middle" id="logTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>PBS</th>
+                        <th>SUB</th>
+                        <th>Feeder</th>
+                        <th>Event</th>
+                        <th>Status</th>
+                        <th>Duration</th>
+                        <th class="remarks-col">Remarks</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading today's logs...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div id="cardView"></div>
+        </div>
+    </div>
+
+    <script>
+        const EXEC_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec";
+        const LOG_BASE_URL = `${EXEC_URL}?mode=history_log`;
+
+        let DATA = [];
+        let ALL_LOG_RECORDS = []; // Store full fetched set for dropdown reference
+        let isTableView = true;
+
+        function setTodayDefaultDates() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('fStart').value = today;
+            document.getElementById('fEnd').value = today;
+        }
+
+        async function init() {
+            setTodayDefaultDates();
+            await fetchFilteredLogs();
+        }
+
+        async function fetchFilteredLogs() {
+            const pbs = document.getElementById('fPBS').value;
+            const sub = document.getElementById('fSUB').value;
+            const fed = document.getElementById('fFed').value;
+            const event = document.getElementById('fEvent').value;
+            const start = document.getElementById('fStart').value;
+            const end = document.getElementById('fEnd').value;
+
+            // Show Loading State
+            const loadingHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Fetching records...</td></tr>';
+            document.getElementById('logBody').innerHTML = loadingHTML;
+            document.getElementById('cardView').innerHTML = '<div class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Fetching records...</div>';
+
+            // Build Param Query URL
+            let queryUrl = `${LOG_BASE_URL}&start=${start}&end=${end}`;
+            if (pbs) queryUrl += `&pbs=${encodeURIComponent(pbs)}`;
+            if (sub) queryUrl += `&sub=${encodeURIComponent(sub)}`;
+            if (fed) queryUrl += `&fed=${encodeURIComponent(fed)}`;
+            if (event) queryUrl += `&event=${encodeURIComponent(event)}`;
+
+            try {
+                const res = await fetch(queryUrl);
+                const rawList = await res.json();
+                
+                DATA = Array.isArray(rawList) ? rawList : [];
+
+                // Store master dataset on broad fetch
+                if (!pbs && !sub && !fed) {
+                    ALL_LOG_RECORDS = DATA;
+                } else if (ALL_LOG_RECORDS.length === 0) {
+                    ALL_LOG_RECORDS = DATA;
+                }
+
+                if (DATA.length === 0) {
+                    const noDataMsg = '<tr><td colspan="8" class="text-center text-warning fw-bold py-3">No log records found for selected period/filter.</td></tr>';
+                    document.getElementById('logBody').innerHTML = noDataMsg;
+                    document.getElementById('cardView').innerHTML = '<div class="text-center text-warning fw-bold py-3">No log records found for selected period/filter.</div>';
+                    return;
+                }
+
+                // Build/maintain complete dropdown lists
+                updateCascadingDropdowns();
+
+                render(DATA);
+            } catch (e) {
+                console.error("Fetch Error:", e);
+                const errorMsg = '<tr><td colspan="8" class="text-center text-danger fw-bold py-3">Error fetching history log. Please verify Apps Script deployment.</td></tr>';
+                document.getElementById('logBody').innerHTML = errorMsg;
+                document.getElementById('cardView').innerHTML = '<div class="text-center text-danger fw-bold py-3">Error fetching history log.</div>';
+            }
+        }
+
+        // --- CASCADING DROPDOWN LOGIC ---
+        function updateCascadingDropdowns() {
+            const masterList = ALL_LOG_RECORDS.length > 0 ? ALL_LOG_RECORDS : DATA;
+
+            // 1. Populate all available PBS options
+            const pbsSet = new Set();
+            masterList.forEach(item => {
+                const pbsVal = item.PBS_ID || item.pbs || item.PBS;
+                if (pbsVal && String(pbsVal).trim() !== "") pbsSet.add(String(pbsVal).trim());
+            });
+            buildSelectOptions('fPBS', Array.from(pbsSet).sort(), 'All PBS');
+
+            // 2. Update SUB & Feeder dropdowns
+            updateSubOptions();
+            updateFeederOptions();
+        }
+
+        function onPbsChange() {
+            document.getElementById('fSUB').value = "";
+            document.getElementById('fFed').value = "";
+            updateSubOptions();
+            updateFeederOptions();
+        }
+
+        function onSubChange() {
+            document.getElementById('fFed').value = "";
+            updateFeederOptions();
+        }
+
+        function updateSubOptions() {
+            const selectedPbs = document.getElementById('fPBS').value;
+            const masterList = ALL_LOG_RECORDS.length > 0 ? ALL_LOG_RECORDS : DATA;
+            const subSet = new Set();
+
+            masterList.forEach(item => {
+                const itemPbs = item.PBS_ID || item.pbs || item.PBS;
+                const itemSub = item.SUB_ID || item.sub || item.SUB;
+
+                if (!selectedPbs || String(itemPbs).trim() === selectedPbs) {
+                    if (itemSub && String(itemSub).trim() !== "") subSet.add(String(itemSub).trim());
+                }
+            });
+
+            buildSelectOptions('fSUB', Array.from(subSet).sort(), 'All SUBs');
+        }
+
+        function updateFeederOptions() {
+            const selectedPbs = document.getElementById('fPBS').value;
+            const selectedSub = document.getElementById('fSUB').value;
+            const masterList = ALL_LOG_RECORDS.length > 0 ? ALL_LOG_RECORDS : DATA;
+            const fedSet = new Set();
+
+            masterList.forEach(item => {
+                const itemPbs = item.PBS_ID || item.pbs || item.PBS;
+                const itemSub = item.SUB_ID || item.sub || item.SUB;
+                const itemFed = item.FeederID || item.feeder || item.relay || item.DEV_ID || item.dev;
+
+                const matchPbs = !selectedPbs || String(itemPbs).trim() === selectedPbs;
+                const matchSub = !selectedSub || String(itemSub).trim() === selectedSub;
+
+                if (matchPbs && matchSub) {
+                    if (itemFed && String(itemFed).trim() !== "") fedSet.add(String(itemFed).trim());
+                }
+            });
+
+            buildSelectOptions('fFed', Array.from(fedSet).sort(), 'All Feeders');
+        }
+
+        function buildSelectOptions(elementId, optionsArray, defaultText) {
+            const select = document.getElementById(elementId);
+            const currentValue = select.value;
+
+            let html = `<option value="">${defaultText}</option>`;
+            optionsArray.forEach(opt => {
+                html += `<option value="${opt}">${opt}</option>`;
+            });
+
+            select.innerHTML = html;
+            if (optionsArray.includes(currentValue)) {
+                select.value = currentValue;
+            }
+        }
+
+        // --- RENDER & VIEW FUNCTIONS ---
+        function toggleView() {
+            isTableView = !isTableView;
+            document.getElementById('logTable').style.display = isTableView ? 'table' : 'none';
+            document.getElementById('cardView').style.display = isTableView ? 'none' : 'block';
+            render(DATA);
+        }
+
+        function formatDisplayDate(rawTime) {
+            if (!rawTime) return "N/A";
+            const dt = new Date(String(rawTime).replace(" ", "T"));
+            return isNaN(dt.getTime()) ? String(rawTime) : dt.toLocaleString();
+        }
+
+        function render(data) {
+            // Filter out events shorter than 5 minutes (300 seconds)
+            const filteredData = (data || []).filter(r => {
+                const totalSecs = Number(r.DurationSeconds || 0);
+                return totalSecs >= 300; // >= 5 minutes
+            });
+
+            if (filteredData.length === 0) {
+                const noMinMsg = '<tr><td colspan="8" class="text-center text-warning fw-bold py-3">No log records equal to or exceeding 5 minutes found.</td></tr>';
+                document.getElementById('logBody').innerHTML = noMinMsg;
+                document.getElementById('cardView').innerHTML = '<div class="text-center text-warning fw-bold py-3">No log records equal to or exceeding 5 minutes found.</div>';
+                return;
+            }
+
+            if (isTableView) {
+                document.getElementById("logBody").innerHTML = filteredData.map(r => {
+                    const timeStr = formatDisplayDate(r.Timestamp);
+                    const mins = (Number(r.DurationSeconds || 0) / 60).toFixed(1);
+                    const eventClass = String(r.Event || "").includes("OFF") ? "event-off" : "event-on";
+                    const feederVal = r.FeederID || r.feeder || r.relay || r.DEV_ID || r.dev || "N/A";
+
+                    return `<tr>
+                        <td>${timeStr}</td>
+                        <td><strong>${r.PBS_ID || r.pbs || "N/A"}</strong></td>
+                        <td>${r.SUB_ID || r.sub || "N/A"}</td>
+                        <td><strong>${feederVal}</strong></td>
+                        <td><span class="badge-event ${eventClass}">${r.Event || "N/A"}</span></td>
+                        <td>${r.Status || "N/A"}</td>
+                        <td class="fw-bold">${mins} min</td>
+                        <td class="remarks-col">${r.Remarks || ""}</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                document.getElementById("cardView").innerHTML = filteredData.map(r => {
+                    const timeStr = formatDisplayDate(r.Timestamp);
+                    const mins = (Number(r.DurationSeconds || 0) / 60).toFixed(1);
+                    const feederVal = r.FeederID || r.feeder || r.relay || r.DEV_ID || r.dev || "N/A";
+
+                    return `<div class="card-item">
+                        <div><span class="card-label">Time:</span> ${timeStr}</div>
+                        <div><span class="card-label">Location:</span> ${r.PBS_ID || r.pbs || "N/A"} / ${r.SUB_ID || r.sub || "N/A"} / <strong>${feederVal}</strong></div>
+                        <div><span class="card-label">Event:</span> <strong>${r.Event || "N/A"}</strong> (${r.Status || "N/A"})</div>
+                        <div><span class="card-label">Duration:</span> ${mins} min</div>
+                        <div><span class="card-label">Remarks:</span> ${r.Remarks || "N/A"}</div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        function exportToExcel() { 
+            const table = document.getElementById('logTable');
+            const wb = XLSX.utils.table_to_book(table, { sheet: "Feeder History Log" });
+            XLSX.writeFile(wb, `Feeder_History_Log_${new Date().toISOString().slice(0,10)}.xlsx`); 
+        }
+
+        function exportToPDF() { 
+            const element = document.getElementById('printableContainer');
+            const opt = {
+                margin:       [10, 10, 10, 10],
+                filename:     `Feeder_History_Log_${new Date().toISOString().slice(0,10)}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+
+            html2pdf().set(opt).from(element).save(); 
+        }
+
+        // Initialize dashboard
+        init();
+    </script>
+</body>
+</html>

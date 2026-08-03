@@ -1,0 +1,668 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palli Bidyut Samity - Reliability History Dashboard</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- SheetJS (Excel Export) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF & AutoTable (PDF Export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        :root {
+            --primary-bg: #1e3a8a;
+            --accent-saifi: #0d6efd;
+            --accent-saidi: #dc3545;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #1e293b;
+        }
+
+        .navbar-custom {
+            background-color: var(--primary-bg);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .metric-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+        }
+
+        .metric-value {
+            font-size: 1.75rem;
+            font-weight: 800;
+            margin-top: 0.25rem;
+        }
+
+        .metric-sub {
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .filter-section {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 1.5rem;
+        }
+
+        .table-responsive-container {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+
+        .custom-table {
+            margin-bottom: 0;
+        }
+
+        .custom-table thead {
+            background-color: #1e293b;
+            color: white;
+        }
+
+        .custom-table th {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 0.85rem;
+            border: none;
+        }
+
+        .custom-table td {
+            font-size: 0.9rem;
+            padding: 0.85rem;
+            vertical-align: middle;
+        }
+
+        .val-saifi {
+            font-weight: 700;
+            color: var(--accent-saifi);
+        }
+
+        .val-saidi {
+            font-weight: 700;
+            color: var(--accent-saidi);
+        }
+
+        /* Mobile Cards */
+        #card-container {
+            display: none;
+        }
+
+        .data-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .card-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.4rem;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            #reportTable {
+                display: none !important;
+            }
+            #card-container {
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="navbar-custom mb-4">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="m-0 fw-bold"><i class="fa-solid me-2 fa-bolt-lightning"></i> Naogaon PBS-1</h4>
+                <small class="opacity-75">Reliability Indices Analysis Dashboard</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" onclick="toggleView()">
+                    <i class="fa-solid fa-table-cells me-1"></i> Toggle View
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mb-5">
+        
+        <!-- Filter Control Panel -->
+        <div class="filter-section shadow-sm">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary small">PBS Unit</label>
+                    <select id="pbsFilter" class="form-select" onchange="updateSubFilter()">
+                        <option value="all">All PBS</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary small">Substation</label>
+                    <select id="subFilter" class="form-select" onchange="applyFilters()">
+                        <option value="all">All Substations</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary small">Reporting Month</label>
+                    <select id="monthFilter" class="form-select" onchange="applyFilters()">
+                        <option value="all">All Months</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button class="btn btn-success w-50 fw-bold" onclick="exportToExcel()">
+                        <i class="fa-solid fa-file-excel me-1"></i> Excel
+                    </button>
+                    <button class="btn btn-danger w-50 fw-bold" onclick="exportToPDF()">
+                        <i class="fa-solid fa-file-pdf me-1"></i> PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Aggregated Metrics Summary -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="metric-card border-start border-4 border-primary">
+                    <div class="metric-title">PBS SAIFI Index</div>
+                    <div class="metric-value text-primary" id="pbsSaifiVal">0.0000</div>
+                    <div class="metric-sub">Interruptions / Customer</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="metric-card border-start border-4 border-danger">
+                    <div class="metric-title">PBS SAIDI Index</div>
+                    <div class="metric-value text-danger" id="pbsSaidiVal">0.00 Hrs</div>
+                    <div class="metric-sub" id="pbsSaidiMinsSub">(0.00 Mins)</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="metric-card border-start border-4 border-warning">
+                    <div class="metric-title">Total System Outage</div>
+                    <div class="metric-value text-warning-emphasis" id="totalHoursVal">0.00 Hrs</div>
+                    <div class="metric-sub" id="totalMinsSub">(0.0 Mins)</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="metric-card border-start border-4 border-success">
+                    <div class="metric-title">Analyzed Feeders</div>
+                    <div class="metric-value text-success" id="totalFeedersVal">0</div>
+                    <div class="metric-sub">Active Line Circuits</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div id="dashboard-content">
+            <!-- Desktop Table View -->
+            <div class="table-responsive-container shadow-sm">
+                <table class="table table-hover align-middle custom-table" id="reportTable">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>PBS ID</th>
+                            <th>Substation</th>
+                            <th>Feeder Name</th>
+                            <th>Customers</th>
+                            <th>Int.</th>
+                            <th>Outage (m)</th>
+                            <th>SAIFI</th>
+                            <th>SAIDI (m)</th>
+                            <th>SAIDI (h)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="10" class="text-center py-4 text-muted">
+                                <i class="fa-solid fa-spinner fa-spin me-2"></i> Fetching history data 
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile Card View Layout -->
+            <div id="card-container" class="mt-3"></div>
+        </div>
+
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        const MASTER_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec?mode=history";
+        let MASTER_DATA = [];
+        let isTableView = true;
+
+        // Dynamic State Metrics
+        let currentMetrics = {
+            pbsSaifi: 0,
+            pbsSaidiMins: 0,
+            pbsSaidiHours: 0,
+            totalMins: 0,
+            totalHours: 0,
+            feederCount: 0,
+            pbsFilterVal: 'All PBS',
+            subFilterVal: 'All Substations',
+            monthFilterVal: 'All Months'
+        };
+
+        function toggleView() {
+            isTableView = !isTableView;
+            document.getElementById('reportTable').style.display = isTableView ? 'table' : 'none';
+            document.getElementById('card-container').style.display = isTableView ? 'none' : 'block';
+            applyFilters();
+        }
+
+        function formatMonth(value) {
+            if (!value) return "";
+            if (typeof value === "string" && /^\d{4}-\d{2}$/.test(value)) return value;
+            if (typeof value === "string" && value.includes("T")) {
+                const d = new Date(value);
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+            }
+            return value;
+        }
+
+        async function loadData() {
+            try {
+                const response = await fetch(MASTER_URL);
+                const data = await response.json();
+                
+                // Parse payload whether it is raw array or wrapped in object key
+                let rawList = [];
+                if (Array.isArray(data)) {
+                    rawList = data;
+                } else if (data && Array.isArray(data.reliability)) {
+                    rawList = data.reliability;
+                } else if (data && Array.isArray(data.data)) {
+                    rawList = data.data;
+                } else if (data && Array.isArray(data.trip)) {
+                    rawList = data.trip;
+                }
+
+                MASTER_DATA = rawList.map(r => ({ ...r, Month: formatMonth(r.Month || r.month || "") }));
+                
+                if (MASTER_DATA.length === 0) {
+                    document.getElementById('dashboard-content').innerHTML = "<div class='alert alert-warning text-center fw-bold p-4'>No reliability records found in Apps Script response.</div>";
+                    return;
+                }
+
+                const pbsSet = new Set(), monthSet = new Set();
+                MASTER_DATA.forEach(r => { 
+                    if (r.PBS_ID || r.pbs) pbsSet.add(r.PBS_ID || r.pbs); 
+                    if (r.Month) monthSet.add(r.Month); 
+                });
+                            
+                const pbsSelect = document.getElementById('pbsFilter');
+                const monthSelect = document.getElementById('monthFilter');
+                
+                pbsSelect.innerHTML = '<option value="all">All PBS</option>';
+                monthSelect.innerHTML = '<option value="all">All Months</option>';
+
+                pbsSet.forEach(p => pbsSelect.innerHTML += `<option value="${p}">${p}</option>`);
+                monthSet.forEach(m => monthSelect.innerHTML += `<option value="${m}">${m}</option>`);
+                
+                updateSubFilter();
+            } catch (e) { 
+                console.error("Fetch Error:", e);
+                document.getElementById('dashboard-content').innerHTML = "<div class='alert alert-danger text-center fw-bold p-4'>Error loading data from Google Sheet service. Verify backend endpoint setup.</div>"; 
+            }
+        }
+
+        function updateSubFilter() {
+            const pbsVal = document.getElementById('pbsFilter').value;
+            const subSelect = document.getElementById('subFilter');
+            subSelect.innerHTML = '<option value="all">All Substations</option>';
+            const subs = new Set();
+            
+            MASTER_DATA.forEach(item => { 
+                const itemPbs = String(item.PBS_ID || item.pbs || "");
+                const itemSub = String(item.SUB_ID || item.sub || "");
+                if (pbsVal === 'all' || itemPbs === pbsVal) {
+                    if (itemSub) subs.add(itemSub); 
+                }
+            });
+            
+            subs.forEach(s => subSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const pbsVal = document.getElementById('pbsFilter').value;
+            const subVal = document.getElementById('subFilter').value;
+            const monthVal = document.getElementById('monthFilter').value;
+                    
+            currentMetrics.pbsFilterVal = pbsVal === 'all' ? 'All PBS' : pbsVal;
+            currentMetrics.subFilterVal = subVal === 'all' ? 'All Substations' : subVal;
+            currentMetrics.monthFilterVal = monthVal === 'all' ? 'All Months' : monthVal;
+
+            const filtered = MASTER_DATA.filter(item => {
+                const itemPbs = String(item.PBS_ID || item.pbs || "");
+                const itemSub = String(item.SUB_ID || item.sub || "");
+                const itemMonth = String(item.Month || "");
+
+                return (pbsVal === 'all' || itemPbs === pbsVal) && 
+                       (subVal === 'all' || itemSub === subVal) && 
+                       (monthVal === 'all' || itemMonth === monthVal);
+            });
+
+            render(filtered);
+        }
+
+        function render(data) {
+            let pbsSaifi = 0;
+            let pbsSaidiMins = 0;
+            let totalOutageMins = 0;
+
+            data.forEach(i => {
+                pbsSaifi += Number(i.SAIFI || i.saifi) || 0;
+                pbsSaidiMins += Number(i.SAIDI || i.saidi) || 0;
+                totalOutageMins += Number(i.OutageMin || i.outageMin) || 0;
+            });
+
+            const pbsSaidiHours = pbsSaidiMins / 60;
+            const totalOutageHours = totalOutageMins / 60;
+
+            // Store active state
+            currentMetrics.pbsSaifi = pbsSaifi;
+            currentMetrics.pbsSaidiMins = pbsSaidiMins;
+            currentMetrics.pbsSaidiHours = pbsSaidiHours;
+            currentMetrics.totalMins = totalOutageMins;
+            currentMetrics.totalHours = totalOutageHours;
+            currentMetrics.feederCount = data.length;
+
+            // Update Summary Cards
+            document.getElementById("pbsSaifiVal").innerText = pbsSaifi.toFixed(4);
+            document.getElementById("pbsSaidiVal").innerText = `${pbsSaidiHours.toFixed(2)} Hrs`;
+            document.getElementById("pbsSaidiMinsSub").innerText = `(${pbsSaidiMins.toFixed(2)} Mins)`;
+                    
+            document.getElementById("totalHoursVal").innerText = `${totalOutageHours.toFixed(2)} Hrs`;
+            document.getElementById("totalMinsSub").innerText = `(${totalOutageMins.toFixed(1)} Mins)`;
+            document.getElementById("totalFeedersVal").innerText = data.length;
+
+            // Render Table Rows
+            document.getElementById("tableBody").innerHTML = data.map(i => {
+                const pbs = i.PBS_ID || i.pbs || "";
+                const sub = i.SUB_ID || i.sub || "";
+                const feeder = i.FeederID || i.dev || i.feeder || "";
+                const cust = i.Customers || i.customers || 0;
+                const intCount = i.Interruptions || i.interruptions || 0;
+                const outageMin = Number(i.OutageMin || i.outageMin) || 0;
+                const saifi = Number(i.SAIFI || i.saifi) || 0;
+                const saidiMins = Number(i.SAIDI || i.saidi) || 0;
+                const saidiHrs = saidiMins / 60;
+
+                return `
+                <tr>
+                    <td>${i.Month}</td>
+                    <td><strong>${pbs}</strong></td>
+                    <td>${sub}</td>
+                    <td>${feeder}</td>
+                    <td>${cust}</td>
+                    <td>${intCount}</td>
+                    <td>${outageMin.toFixed(1)}</td>
+                    <td class="val-saifi">${saifi.toFixed(4)}</td>
+                    <td class="val-saidi">${saidiMins.toFixed(4)}</td>
+                    <td class="val-saidi">${saidiHrs.toFixed(4)}</td>
+                </tr>`;
+            }).join('');
+
+            // Render Mobile Cards
+            document.getElementById("card-container").innerHTML = data.map(i => {
+                const pbs = i.PBS_ID || i.pbs || "";
+                const sub = i.SUB_ID || i.sub || "";
+                const feeder = i.FeederID || i.dev || i.feeder || "";
+                const cust = i.Customers || i.customers || 0;
+                const intCount = i.Interruptions || i.interruptions || 0;
+                const outageMin = Number(i.OutageMin || i.outageMin) || 0;
+                const saifi = Number(i.SAIFI || i.saifi) || 0;
+                const saidiMins = Number(i.SAIDI || i.saidi) || 0;
+                const saidiHrs = saidiMins / 60;
+
+                return `
+                <div class="data-card">
+                    <div class="card-row"><strong>${i.Month} | ${pbs}</strong> <span>${sub}</span></div>
+                    <div class="card-row">Feeder: <strong>${feeder}</strong></div>
+                    <div class="card-row">Cust: ${cust} | Int: ${intCount}</div>
+                    <div class="card-row">Outage: ${outageMin.toFixed(1)} Mins (${(outageMin/60).toFixed(2)} Hrs)</div>
+                    <div class="card-row">
+                        <span class="val-saifi">SAIFI: ${saifi.toFixed(4)}</span> 
+                        <span class="val-saidi">SAIDI: ${saidiHrs.toFixed(3)} Hrs (${saidiMins.toFixed(2)}m)</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Excel Export (SheetJS)
+        function exportToExcel() {
+            const pbsVal = document.getElementById('pbsFilter').value;
+            const subVal = document.getElementById('subFilter').value;
+            const monthVal = document.getElementById('monthFilter').value;
+
+            const filtered = MASTER_DATA.filter(item => {
+                const itemPbs = String(item.PBS_ID || item.pbs || "");
+                const itemSub = String(item.SUB_ID || item.sub || "");
+                const itemMonth = String(item.Month || "");
+
+                return (pbsVal === 'all' || itemPbs === pbsVal) && 
+                       (subVal === 'all' || itemSub === subVal) && 
+                       (monthVal === 'all' || itemMonth === monthVal);
+            });
+
+            const excelData = [];
+            
+            excelData.push(["PALLI BIDYUT SAMITY RELIABILITY REPORT"]);
+            excelData.push([`Filters Applied - PBS: ${currentMetrics.pbsFilterVal} | Substation: ${currentMetrics.subFilterVal} | Month: ${currentMetrics.monthFilterVal}`]);
+            excelData.push([]);
+            
+            excelData.push(["OVERALL PBS METRICS SUMMARY"]);
+            excelData.push(["PBS SAIFI (Interruption/Customer)", currentMetrics.pbsSaifi.toFixed(4)]);
+            excelData.push(["PBS SAIDI (Hours)", currentMetrics.pbsSaidiHours.toFixed(4)]);
+            excelData.push(["PBS SAIDI (Minutes)", currentMetrics.pbsSaidiMins.toFixed(2)]);
+            excelData.push(["Total System Outage Duration (Hours)", currentMetrics.totalHours.toFixed(2)]);
+            excelData.push(["Total System Outage Duration (Minutes)", currentMetrics.totalMins.toFixed(1)]);
+            excelData.push(["Total Feeders Analyzed", currentMetrics.feederCount]);
+            excelData.push([]);
+
+            excelData.push(["Month", "PBS ID", "Substation", "Feeder Name", "Customers", "Interruptions", "Outage Duration (Mins)", "Outage Duration (Hours)", "Feeder SAIFI", "Feeder SAIDI (Mins)", "Feeder SAIDI (Hours)"]);
+
+            filtered.forEach(i => {
+                const mins = Number(i.OutageMin || i.outageMin) || 0;
+                const sMins = Number(i.SAIDI || i.saidi) || 0;
+                excelData.push([
+                    i.Month,
+                    i.PBS_ID || i.pbs || "",
+                    i.SUB_ID || i.sub || "",
+                    i.FeederID || i.dev || "",
+                    Number(i.Customers || i.customers) || 0,
+                    Number(i.Interruptions || i.interruptions) || 0,
+                    mins,
+                    mins / 60,
+                    Number(i.SAIFI || i.saifi) || 0,
+                    sMins,
+                    sMins / 60
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            ws['!cols'] = [
+                {wch: 12}, {wch: 15}, {wch: 15}, {wch: 22}, {wch: 12}, 
+                {wch: 14}, {wch: 22}, {wch: 22}, {wch: 14}, {wch: 20}, {wch: 20}
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "PBS Reliability Analysis");
+            XLSX.writeFile(wb, `PBS_Reliability_Report_${currentMetrics.monthFilterVal}.xlsx`);
+        }
+
+        // Styled PDF Export (jsPDF + AutoTable)
+        function exportToPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+
+            // Header Banner
+            doc.setFillColor(30, 58, 138);
+            doc.rect(0, 0, 210, 28, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.text("PALLI BIDYUT SAMITY RELIABILITY REPORT", 14, 15);
+            
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Scope: ${currentMetrics.pbsFilterVal}  |  Substation: ${currentMetrics.subFilterVal}  |  Month: ${currentMetrics.monthFilterVal}`, 14, 22);
+
+            // Summary Card Box
+            doc.setFillColor(248, 250, 252);
+            doc.setDrawColor(226, 232, 240);
+            doc.roundedRect(14, 33, 182, 30, 3, 3, 'FD');
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            doc.setTextColor(15, 23, 42);
+            doc.text("SYSTEM RELIABILITY SUMMARY", 18, 40);
+
+            doc.setFontSize(8);
+            doc.setTextColor(71, 85, 105);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("PBS SAIFI:", 18, 47);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(13, 110, 253);
+            doc.text(`${currentMetrics.pbsSaifi.toFixed(4)} int/cust`, 45, 47);
+
+            doc.setTextColor(71, 85, 105);
+            doc.setFont("helvetica", "bold");
+            doc.text("PBS SAIDI:", 18, 54);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(220, 53, 69);
+            doc.text(`${currentMetrics.pbsSaidiHours.toFixed(2)} Hours (${currentMetrics.pbsSaidiMins.toFixed(1)} Mins)`, 45, 54);
+
+            doc.setTextColor(71, 85, 105);
+            doc.setFont("helvetica", "bold");
+            doc.text("Total Outage:", 110, 47);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(217, 119, 6);
+            doc.text(`${currentMetrics.totalHours.toFixed(2)} Hours (${currentMetrics.totalMins.toFixed(1)} Mins)`, 135, 47);
+
+            doc.setTextColor(71, 85, 105);
+            doc.setFont("helvetica", "bold");
+            doc.text("Total Feeders:", 110, 54);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(5, 150, 105);
+            doc.text(`${currentMetrics.feederCount} Active Feeders`, 135, 54);
+
+            const pbsVal = document.getElementById('pbsFilter').value;
+            const subVal = document.getElementById('subFilter').value;
+            const monthVal = document.getElementById('monthFilter').value;
+
+            const filtered = MASTER_DATA.filter(item => {
+                const itemPbs = String(item.PBS_ID || item.pbs || "");
+                const itemSub = String(item.SUB_ID || item.sub || "");
+                const itemMonth = String(item.Month || "");
+
+                return (pbsVal === 'all' || itemPbs === pbsVal) && 
+                       (subVal === 'all' || itemSub === subVal) && 
+                       (monthVal === 'all' || itemMonth === monthVal);
+            });
+
+            const tableRows = filtered.map(i => {
+                const sMins = Number(i.SAIDI || i.saidi) || 0;
+                const sHrs = sMins / 60;
+                return [
+                    i.Month,
+                    i.PBS_ID || i.pbs || "",
+                    i.SUB_ID || i.sub || "",
+                    i.FeederID || i.dev || "",
+                    i.Customers || i.customers || 0,
+                    i.Interruptions || i.interruptions || 0,
+                    Number(i.OutageMin || i.outageMin || 0).toFixed(1),
+                    Number(i.SAIFI || i.saifi || 0).toFixed(4),
+                    sHrs.toFixed(3)
+                ];
+            });
+
+            doc.autoTable({
+                startY: 68,
+                head: [['Month', 'PBS', 'Substation', 'Feeder', 'Cust', 'Int', 'Outage (m)', 'SAIFI', 'SAIDI (h)']],
+                body: tableRows,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [30, 41, 59],
+                    textColor: [255, 255, 255],
+                    fontSize: 8,
+                    fontStyle: 'bold',
+                    halign: 'center'
+                },
+                bodyStyles: {
+                    fontSize: 7.5,
+                    textColor: [30, 41, 59]
+                },
+                columnStyles: {
+                    0: { halign: 'center' },
+                    1: { halign: 'center' },
+                    2: { halign: 'center' },
+                    4: { halign: 'right' },
+                    5: { halign: 'right' },
+                    6: { halign: 'right' },
+                    7: { halign: 'right', fontStyle: 'bold', textColor: [13, 110, 253] },
+                    8: { halign: 'right', fontStyle: 'bold', textColor: [220, 53, 69] }
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 250, 252]
+                },
+                margin: { left: 14, right: 14 }
+            });
+
+            doc.save(`PBS_Reliability_Report_${currentMetrics.monthFilterVal}.pdf`);
+        }
+
+        // Initialize Data Load
+        loadData();
+    </script>
+</body>
+</html>
