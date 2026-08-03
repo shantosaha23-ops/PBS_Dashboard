@@ -10,9 +10,9 @@
     <!-- FontAwesome Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
-    <!-- SheetJS (Excel) & html2pdf (PDF Export) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- SheetJS & html2pdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" async></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" async></script>
 
     <style>
         :root {
@@ -99,9 +99,7 @@
             padding: 12px; 
             margin-bottom: 10px; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.06); 
-            border-top: 1px solid #e9ecef;
-            border-right: 1px solid #e9ecef;
-            border-bottom: 1px solid #e9ecef;
+            border: 1px solid #e9ecef;
         }
 
         .card-item div { 
@@ -216,7 +214,8 @@
                 <tbody id="logBody">
                     <tr>
                         <td colspan="8" class="text-center py-4 text-muted">
-                            <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading history records 
+                            <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading history records...
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -231,33 +230,44 @@
         let isTableView = true;
 
         async function init() {
+            // 1. Instant load from Session Storage Cache if available
+            const cachedData = sessionStorage.getItem('feeder_history_cache');
+            if (cachedData) {
+                try {
+                    DATA = JSON.parse(cachedData);
+                    populatePBS();
+                    applyFilters();
+                } catch(e) {
+                    sessionStorage.removeItem('feeder_history_cache');
+                }
+            }
+
+            // 2. Fetch fresh data in background
             try {
-                const res = await fetch(LOG_URL);
+                const res = await fetch(LOG_URL, { cache: "no-cache" });
                 const rawJson = await res.json();
                 
-                // Flexibly parse payload whether direct array or wrapped object
-                let rawList = [];
-                if (Array.isArray(rawJson)) {
-                    rawList = rawJson;
-                } else if (rawJson && Array.isArray(rawJson.fault)) {
-                    rawList = rawJson.fault;
-                } else if (rawJson && Array.isArray(rawJson.trip)) {
-                    rawList = rawJson.trip;
-                } else if (rawJson && Array.isArray(rawJson.data)) {
-                    rawList = rawJson.data;
+                let rawList = Array.isArray(rawJson) ? rawJson : 
+                              (rawJson.fault || rawJson.trip || rawJson.data || []);
+
+                // Fast Direct Array Pre-processing
+                DATA = new Array(rawList.length);
+                for (let i = 0; i < rawList.length; i++) {
+                    const r = rawList[i];
+                    DATA[i] = {
+                        Timestamp: r.Timestamp || r.timestamp || r.Time || r.time || "",
+                        PBS_ID: r.PBS_ID || r.pbs || "",
+                        SUB_ID: r.SUB_ID || r.sub || "",
+                        FeederID: r.FeederID || r.feeder || r.dev || "",
+                        Event: r.Event || r.event || "",
+                        Status: r.Status || r.status || "",
+                        DurationSeconds: Number(r.DurationSeconds || r.durationSeconds || r.Duration || r.duration || 0),
+                        Remarks: r.Remarks || r.remarks || ""
+                    };
                 }
 
-                // Standardize field mappings
-                DATA = rawList.map(r => ({
-                    Timestamp: r.Timestamp || r.timestamp || r.Time || r.time || "",
-                    PBS_ID: r.PBS_ID || r.pbs || "",
-                    SUB_ID: r.SUB_ID || r.sub || "",
-                    FeederID: r.FeederID || r.feeder || r.dev || "",
-                    Event: r.Event || r.event || "",
-                    Status: r.Status || r.status || "",
-                    DurationSeconds: Number(r.DurationSeconds || r.durationSeconds || r.Duration || r.duration || 0),
-                    Remarks: r.Remarks || r.remarks || ""
-                }));
+                // Cache for quick reload during session
+                sessionStorage.setItem('feeder_history_cache', JSON.stringify(DATA));
 
                 if (DATA.length === 0) {
                     document.getElementById('logBody').innerHTML = '<tr><td colspan="8" class="text-center text-warning fw-bold py-3">No log records found.</td></tr>';
@@ -268,7 +278,9 @@
                 applyFilters();
             } catch (e) {
                 console.error("Fetch Error:", e);
-                document.getElementById('logBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger fw-bold py-3">Error fetching history log. Please verify Apps Script deployment.</td></tr>';
+                if (!cachedData) {
+                    document.getElementById('logBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger fw-bold py-3">Error fetching history log. Please verify Apps Script deployment.</td></tr>';
+                }
             }
         }
 
@@ -280,7 +292,11 @@
         }
 
         function populatePBS() {
-            const pbsList = [...new Set(DATA.map(r => r.PBS_ID).filter(Boolean))];
+            const pbsSet = new Set();
+            for (let i = 0; i < DATA.length; i++) {
+                if (DATA[i].PBS_ID) pbsSet.add(DATA[i].PBS_ID);
+            }
+            const pbsList = Array.from(pbsSet);
             document.getElementById('fPBS').innerHTML = '<option value="">All PBS</option>' + pbsList.map(p => `<option value="${p}">${p}</option>`).join('');
         }
 
@@ -291,12 +307,21 @@
             const selectedSub = subSelect.value;
             const selectedFed = fedSelect.value;
 
-            const subs = [...new Set(DATA.filter(r => !pbs || r.PBS_ID == pbs).map(r => r.SUB_ID).filter(Boolean))];
-            subSelect.innerHTML = '<option value="">All SUBs</option>' + subs.map(s => `<option value="${s}" ${s == selectedSub ? 'selected' : ''}>${s}</option>`).join('');
-            
-            const activeSub = subSelect.value;
-            const feds = [...new Set(DATA.filter(r => (!pbs || r.PBS_ID == pbs) && (!activeSub || r.SUB_ID == activeSub)).map(r => r.FeederID).filter(Boolean))];
-            fedSelect.innerHTML = '<option value="">All Feeders</option>' + feds.map(f => `<option value="${f}" ${f == selectedFed ? 'selected' : ''}>${f}</option>`).join('');
+            const subSet = new Set();
+            const fedSet = new Set();
+
+            for (let i = 0; i < DATA.length; i++) {
+                const r = DATA[i];
+                if (!pbs || r.PBS_ID == pbs) {
+                    if (r.SUB_ID) subSet.add(r.SUB_ID);
+                    if (!selectedSub || r.SUB_ID == selectedSub) {
+                        if (r.FeederID) fedSet.add(r.FeederID);
+                    }
+                }
+            }
+
+            subSelect.innerHTML = '<option value="">All SUBs</option>' + Array.from(subSet).map(s => `<option value="${s}" ${s == selectedSub ? 'selected' : ''}>${s}</option>`).join('');
+            fedSelect.innerHTML = '<option value="">All Feeders</option>' + Array.from(fedSet).map(f => `<option value="${f}" ${f == selectedFed ? 'selected' : ''}>${f}</option>`).join('');
             
             applyFilters();
         }
@@ -310,43 +335,54 @@
             const startVal = document.getElementById('fStart').value;
             const endVal = document.getElementById('fEnd').value;
             
-            const start = startVal ? new Date(startVal) : null;
-            const end = endVal ? new Date(endVal) : null;
-            if (end) end.setHours(23, 59, 59, 999);
+            const start = startVal ? new Date(startVal).getTime() : null;
+            const end = endVal ? new Date(endVal).setHours(23, 59, 59, 999) : null;
 
-            const filtered = DATA.filter(r => {
-                const date = new Date(r.Timestamp);
-                const durationInSeconds = Number(r.DurationSeconds) || 0;
+            const filtered = [];
+            
+            for (let i = 0; i < DATA.length; i++) {
+                const r = DATA[i];
+                const durationInSeconds = r.DurationSeconds;
 
-                const matchesPbs = !pbs || r.PBS_ID == pbs;
-                const matchesSub = !sub || r.SUB_ID == sub;
-                const matchesFed = !fed || r.FeederID == fed;
-                const matchesEvent = !event || r.Event == event;
-                const matchesStart = !start || (date >= start);
-                const matchesEnd = !end || (date <= end);
-                const matchesMinDuration = durationInSeconds > 300; // Exclude brief outages < 5 mins
+                if (durationInSeconds <= 300) continue; // Skip < 5 min outages fast
+                if (pbs && r.PBS_ID != pbs) continue;
+                if (sub && r.SUB_ID != sub) continue;
+                if (fed && r.FeederID != fed) continue;
+                if (event && r.Event != event) continue;
 
-                return matchesPbs && matchesSub && matchesFed && matchesEvent && matchesStart && matchesEnd && matchesMinDuration;
-            });
+                if (start || end) {
+                    const timeMs = new Date(r.Timestamp).getTime();
+                    if (start && timeMs < start) continue;
+                    if (end && timeMs > end) continue;
+                }
+
+                filtered.push(r);
+            }
 
             render(filtered);
         }
 
         function render(data) {
-            const reversedData = [...data].reverse();
+            const len = data.length;
+            if (len === 0) {
+                const emptyMsg = '<div class="text-center text-muted py-3">No events matching selected filters.</div>';
+                if (isTableView) document.getElementById("logBody").innerHTML = `<tr><td colspan="8">${emptyMsg}</td></tr>`;
+                else document.getElementById("cardView").innerHTML = emptyMsg;
+                return;
+            }
+
+            // Render top 200 records first to avoid freezing DOM
+            const displayLimit = Math.min(len, 200);
+            let html = '';
 
             if (isTableView) {
-                if (reversedData.length === 0) {
-                    document.getElementById("logBody").innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No events matching selected filters.</td></tr>';
-                    return;
-                }
-
-                document.getElementById("logBody").innerHTML = reversedData.map(r => {
+                for (let i = len - 1; i >= len - displayLimit; i--) {
+                    const r = data[i];
                     const timeStr = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : "N/A";
-                    const mins = (Number(r.DurationSeconds) / 60).toFixed(1);
+                    const mins = (r.DurationSeconds / 60).toFixed(1);
                     const eventClass = r.Event.includes("OFF") ? "event-off" : "event-on";
 
-                    return `<tr>
+                    html += `<tr>
                         <td>${timeStr}</td>
                         <td><strong>${r.PBS_ID}</strong></td>
                         <td>${r.SUB_ID}</td>
@@ -356,26 +392,23 @@
                         <td class="fw-bold">${mins} min</td>
                         <td class="remarks-col">${r.Remarks || ""}</td>
                     </tr>`;
-                }).join('');
-            } else {
-                if (reversedData.length === 0) {
-                    document.getElementById("cardView").innerHTML = '<div class="text-center text-muted py-3">No events matching selected filters.</div>';
-                    return;
                 }
-
-                document.getElementById("cardView").innerHTML = reversedData.map(r => {
+                document.getElementById("logBody").innerHTML = html;
+            } else {
+                for (let i = len - 1; i >= len - displayLimit; i--) {
+                    const r = data[i];
                     const timeStr = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : "N/A";
-                    const mins = (Number(r.DurationSeconds) / 60).toFixed(1);
+                    const mins = (r.DurationSeconds / 60).toFixed(1);
 
-                    return `
-                    <div class="card-item">
+                    html += `<div class="card-item">
                         <div><span class="card-label">Time:</span> ${timeStr}</div>
                         <div><span class="card-label">Location:</span> ${r.PBS_ID} / ${r.SUB_ID} / <strong>${r.FeederID}</strong></div>
                         <div><span class="card-label">Event:</span> <strong>${r.Event || "N/A"}</strong> (${r.Status || "N/A"})</div>
                         <div><span class="card-label">Duration:</span> ${mins} min</div>
                         <div><span class="card-label">Remarks:</span> ${r.Remarks || "N/A"}</div>
                     </div>`;
-                }).join('');
+                }
+                document.getElementById("cardView").innerHTML = html;
             }
         }
 
@@ -398,7 +431,6 @@
             html2pdf().set(opt).from(element).save(); 
         }
 
-        // Initialize dashboard
         init();
     </script>
 </body>
