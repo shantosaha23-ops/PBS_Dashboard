@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +15,7 @@
         #subSearch { flex: 2 1 200px; }
         .row-bottom { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 5px; }
         select{ padding:10px; border-radius:8px; border:1px solid #ccc; }
-        #onlineStatus{ padding:6px 12px; border-radius:6px; color:#fff; background:#888; font-weight:700; }
+        #onlineStatus{ padding:6px 12px; border-radius:6px; color:#fff; background:#888; font-weight:700; transition: background 0.3s; }
         #container{ flex-grow: 1; overflow-y: auto; padding-right: 5px; }
         .substationTitle{ margin-top:24px; margin-bottom:10px; font-size:20px; font-weight:700; color:#0d47a1; }
         .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
@@ -41,10 +42,10 @@
     <h1>PBS Multi Substation Feeder Monitoring</h1>        
     <div id="controls">            
         <select id="pbsFilter" onchange="onFilterChange()">             
-            <option value="SELECT">-- Select PBS --</option>         
+            <option value="SELECT">-- Select PBS --</option>          
         </select>        
         <select id="subFilter" onchange="renderCards()">             
-            <option value="ALL">All Substation</option>         
+            <option value="ALL">All Substation</option>          
         </select>        
         <input type="text" id="subSearch" placeholder="Search Substation..." oninput="renderCards()">    
     </div>
@@ -61,7 +62,9 @@
 const FIREBASE_URL = "https://allpbs-f3b0c-default-rtdb.asia-southeast1.firebasedatabase.app";
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec";    
 
-let firebaseData = {}; let sheetTripData = []; let faultData = []; let cardMap = {};
+let firebaseData = {}; let sheetTripData = []; let cardMap = {};
+let isInitialLoad = true;
+let isFetching = false;
 
 function formatDisplayTime(t) {
   if (!t || t === "--") return "--";
@@ -74,45 +77,57 @@ function formatDisplayTime(t) {
 
 function toggleDetails(id) {
   const el = document.getElementById("details_" + id);
-  el.style.display = (el.style.display === "block") ? "none" : "block";
+  if(el) el.style.display = (el.style.display === "block") ? "none" : "block";
 }
 
-// Keep track of loading state
-let isInitialLoad = true;
+// Fetch helper with retry logic for resilient connections
+async function fetchWithRetry(url, options = {}, retries = 2, delay = 1000) {
+  try {
+    return await axios.get(url, options);
+  } catch (err) {
+    if (retries <= 0) throw err;
+    await new Promise(res => setTimeout(res, delay));
+    return fetchWithRetry(url, options, retries - 1, delay * 1.5);
+  }
+}
 
 async function loadAll() {
-    document.getElementById("onlineStatus").innerText = "Updating...";
-    
+    if (isFetching) return;
+    isFetching = true;
+
+    const statusEl = document.getElementById("onlineStatus");
+    statusEl.innerText = "Updating...";
+    statusEl.style.background = "#f39c12";
+
     try {
-        // 1. Fetch everything in parallel again, but with better error handling
-        // Increase timeout for the Sheet requests as they are slower
-        const [fb, trip, fault] = await Promise.all([
-            axios.get(FIREBASE_URL + "/.json", { timeout: 15000 }),
-            axios.get(SCRIPT_URL + "?mode=trip", { timeout: 20000 }),
-            axios.get(SCRIPT_URL + "?mode=fault", { timeout: 20000 })
-        ]);
+        // Parallel fetching: Firebase realtime status + Consolidated GAS Endpoint
+        const fbPromise = fetchWithRetry(FIREBASE_URL + "/.json", { timeout: 12000 });
+        const gasPromise = fetchWithRetry(SCRIPT_URL + "?mode=allData", { timeout: 25000 });
+
+        const [fb, gas] = await Promise.all([fbPromise, gasPromise]);
 
         firebaseData = fb.data || {};
-        sheetTripData = Array.isArray(trip.data) ? trip.data : (trip.data?.data || []);
-        window.allFaults = Array.isArray(fault.data) ? fault.data : (fault.data?.data || []);
+        sheetTripData = gas.data?.trip || [];
+        window.allFaults = gas.data?.fault || [];
 
-        // 2. Build filters ONLY on initial load to avoid UI jumping
         if (isInitialLoad) {
             buildFilters();
             isInitialLoad = false;
         }
 
-        // 3. Render once everything is confirmed
         renderCards();
         
-        document.getElementById("onlineStatus").innerText = "ONLINE";
-        document.getElementById("onlineStatus").style.background = "#2ecc71";
+        statusEl.innerText = "ONLINE";
+        statusEl.style.background = "#2ecc71";
     } catch (err) {
         console.error("Dashboard error:", err);
-        document.getElementById("onlineStatus").innerText = "OFFLINE (Retrying...)";
-        document.getElementById("onlineStatus").style.background = "#c62828";
+        statusEl.innerText = "RETRYING...";
+        statusEl.style.background = "#c62828";
+    } finally {
+        isFetching = false;
     }
 }
+
 function buildFilters() {
     const pbsFilter = document.getElementById("pbsFilter");
     const subFilter = document.getElementById("subFilter");
@@ -159,7 +174,7 @@ function renderCards() {
         
     let pbsOnCount = 0; let pbsTotalCount = 0;
     let pbsOnlineSubs = 0;
-    let pbsTotalSubs = Object.keys(firebaseData[pbs]).length;
+    let pbsTotalSubs = Object.keys(firebaseData[pbs] || {}).length;
 
     for (let sub in firebaseData[pbs]) {
       let isSubOnline = false;
@@ -249,7 +264,7 @@ function renderCards() {
                     
           const fb = firebaseData[pbs][sub][dev][relay];
           const row = getSheetRow(pbs, sub, dev, relay); 
-          const id = `${pbs}_${sub}_${dev}_${relay}`;
+          const id = `${pbs}_${sub}_${dev}_${relay}`.replace(/\s+/g, '_');
           cardMap[id] = { pbs, sub, dev, relay };
 
           const displayStatus = isSubOnline ? (fb.status || "--") : "--";
@@ -312,16 +327,23 @@ function onFilterChange() {
 }
 
 async function saveFault(id) {
-  const reason = document.getElementById("input_" + id).value.trim();
+  const inputEl = document.getElementById("input_" + id);
+  if(!inputEl) return;
+  const reason = inputEl.value.trim();
   if(!reason) return alert("Enter fault reason");
   const obj = cardMap[id];
-  await fetch(`${SCRIPT_URL}?mode=saveFault&pbs=${encodeURIComponent(obj.pbs)}&sub=${encodeURIComponent(obj.sub)}&dev=${encodeURIComponent(obj.dev)}&relay=${encodeURIComponent(obj.relay)}&message=${encodeURIComponent(reason)}`, {method:"POST", mode:"no-cors"});
-  setTimeout(loadAll, 1000);
+  try {
+    const postUrl = `${SCRIPT_URL}?pbs=${encodeURIComponent(obj.pbs)}&sub=${encodeURIComponent(obj.sub)}&dev=${encodeURIComponent(obj.dev)}&relay=${encodeURIComponent(obj.relay)}&message=${encodeURIComponent(reason)}`;
+    await fetch(postUrl, { method: "POST", mode: "no-cors" });
+    setTimeout(loadAll, 1000);
+  } catch (e) {
+    alert("Failed to save fault reason. Please try again.");
+  }
 }
 
 async function refreshDashboard() { await loadAll(); }
 
-// Safely boot dashboard and refresh every 30 seconds
+// Initial boot and background refresh interval set to 30s for real-time responsiveness
 refreshDashboard();
 setInterval(refreshDashboard, 30000);
 </script>
