@@ -1,6 +1,4 @@
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -152,6 +150,28 @@
             background: #2563eb;
             border-color: #60a5fa;
         }
+
+        /* Custom Substation Marker Styling */
+        .substation-icon-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .substation-marker-pin {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--substation-color, #ea580c);
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+        }
+        .substation-marker-pin:hover {
+            transform: scale(1.2);
+        }
     </style>
 </head>
 <body>
@@ -177,6 +197,12 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js" charset="utf-8"></script>
     <script>
+        // ==========================================
+        // CONFIGURATION: Substation Landmark Styling
+        // ==========================================
+        const SUBSTATION_COLOR = "#ea580c";       
+        const SUBSTATION_BORDER_COLOR = "#ffffff"; 
+
         // 1. Tile Layers
         const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -293,7 +319,7 @@
             map.closePopup(measurePopup);
         }
 
-        // 360° Perspective View
+        // 360° Perspective View Controls
         let is3D = false;
         let currentRotation = 0;
         let isDraggingCompass = false;
@@ -355,13 +381,14 @@
             }
         });
 
-        // Data Sources
+        // Target Endpoints
+        const KML_LANDMARKS_URL = "https://raw.githubusercontent.com/shantosaha23-ops/gisdashboard/refs/heads/main/pbs_info.kml";
         const KML_FEEDER_URL = "https://raw.githubusercontent.com/shantosaha23-ops/gisdashboard/refs/heads/main/test.kml";
         const FIREBASE_URL = "https://allpbs-f3b0c-default-rtdb.asia-southeast1.firebasedatabase.app/.json";
-        
+
         let firebaseData = {};
-        let geoJsonLayer = null;
-        let kmlData = null;
+        let feederGeoJsonLayer = null;
+        let feederKmlData = [];
 
         async function loadFirebase() {
             try {
@@ -370,7 +397,6 @@
             } catch(e) { console.log("Firebase load error:", e); }
         }
 
-        // Extracts all matching Feeder Key variations for robust matching across 96 lines
         function getFeederIDs(name) {
             if (!name) return [];
             return name.split('/').map(part => {
@@ -433,66 +459,191 @@
             return tags;
         }
 
-        // Color coding rule for all 96 polylines
         function getColor(tags, online) {
-            if (!online) return "blue"; // Offline line status
+            if (!online) return "#2563eb"; // Offline / Static
             let on = 0, off = 0;
             tags.forEach(t => { 
                 if (t.status === "ON") on++;
                 if (t.status === "OFF") off++;
             });
-            if (on && off) return "orange"; // Partial/mixed status
-            return off ? "red" : "Magenta"; // OFF vs ON line status
+            if (on && off) return "#f59e0b"; // Mixed status
+            return off ? "#ef4444" : "#d946ef"; // OFF vs ON
         }
 
-        function buildPopup(props, nameStr, online, tags) {
+        function buildDynamicPopup(props, nameStr, online, tags) {
             let html = `<div style="font-family:sans-serif;font-size:13px;min-width:220px;">
                 <div style="background:#1f2937;color:white;padding:8px;text-align:center;font-weight:bold;border-radius:4px 4px 0 0;">${nameStr || "Feeder Line"}</div>
-                <div style="text-align:center;margin:10px;"><span style="padding:4px 12px;border-radius:15px;color:white;font-weight:bold;background:${online ? '#22c55e' : '#ef4444'}">${online ? "ONLINE" : "OFFLINE"}</span></div>`;
-            if (online && tags.length) {
+                <div style="text-align:center;margin:10px;"><span style="padding:4px 12px;border-radius:15px;color:white;font-weight:bold;background:${online ? '#22c55e' : '#6b7280'}">${online ? "ONLINE" : "OFFLINE / STATIC"}</span></div>`;
+            if (tags.length) {
                 html += `<div style="margin-bottom:8px;"><b>Feeder Status:</b><br>${tags.map(t => `${t.name}: <b style="color:${t.status === 'ON' ? '#16a34a' : '#dc2626'}">${t.status}</b>`).join("<br>")}</div>`;
             }
             html += `<hr style="border:0;border-top:1px solid #ddd;"><b>Details</b><table style="font-size:12px;width:100%;">`;
             for (const k in props) {
-                if (k !== "name" && props[k]) {
+                if (k !== "name" && k !== "folder" && props[k]) {
                     html += `<tr><td style="font-weight:bold;">${k}</td><td>: ${props[k]}</td></tr>`;
                 }
             }
             return html + `</table></div>`;
         }
 
+        function buildStaticPopup(props, nameStr) {
+            let html = `<div style="font-family:sans-serif;font-size:13px;min-width:220px;">
+                <div style="background:${SUBSTATION_COLOR};color:white;padding:8px;text-align:center;font-weight:bold;border-radius:4px 4px 0 0;">⚡ ${nameStr || "Substation Landmark"}</div>
+                <div style="padding:8px;">`;
+            html += `<table style="font-size:12px;width:100%;">`;
+            for (const k in props) {
+                if (k !== "name" && k !== "folder" && props[k]) {
+                    html += `<tr><td style="font-weight:bold;padding:2px 0;">${k}</td><td>: ${props[k]}</td></tr>`;
+                }
+            }
+            return html + `</table></div></div>`;
+        }
+
+        // =========================================================================
+        // RESILIENT KML PARSER: Strips Namespaces & Resolves Google Earth Pro Edits
+        // =========================================================================
         function parseKmlXml(xmlText) {
-            const xml = new DOMParser().parseFromString(xmlText, "text/xml");
-            return Array.from(xml.getElementsByTagName("Placemark")).map(pm => {
-                const coordEl = pm.getElementsByTagName("coordinates")[0];
-                if (!coordEl || !coordEl.textContent) return null;
-                
-                const props = { name: pm.getElementsByTagName("name")[0]?.textContent || "" };
+            if (!xmlText) return [];
+
+            // 1. Strip all XML namespace declarations and tag prefixes (e.g. <kml:Placemark> -> <Placemark>)
+            let cleanedText = xmlText
+                .replace(/xmlns(?::\w+)?="[^"]*"/g, '')
+                .replace(/<\/?\w+:/g, (match) => match.startsWith('</') ? '</' : '<');
+
+            const xml = new DOMParser().parseFromString(cleanedText, "text/xml");
+            const features = [];
+
+            const placemarks = Array.from(xml.getElementsByTagName("Placemark"));
+
+            placemarks.forEach(pm => {
+                const nameEl = pm.getElementsByTagName("name")[0];
+                let pmName = nameEl ? nameEl.textContent.trim() : "";
+
+                // Walk upward through DOM to locate parent Folder
+                let parentFolder = pm.closest ? pm.closest("Folder") : null;
+                if (!parentFolder) {
+                    let curr = pm.parentNode;
+                    while (curr && curr.nodeName.toLowerCase() !== "folder") {
+                        curr = curr.parentNode;
+                    }
+                    if (curr && curr.nodeName.toLowerCase() === "folder") {
+                        parentFolder = curr;
+                    }
+                }
+
+                let folderName = "";
+                if (parentFolder) {
+                    const fNameEl = parentFolder.getElementsByTagName("name")[0];
+                    folderName = fNameEl ? fNameEl.textContent.trim() : "";
+                }
+
+                // Fallback: Inherit Folder Name if item name is blank or auto-generated by Google Earth
+                const genericKeywords = ["line", "path", "untitled", "polyline", "polygon", "element", "placemark"];
+                const isGeneric = !pmName || genericKeywords.some(g => pmName.toLowerCase().includes(g));
+
+                if (isGeneric && folderName) {
+                    pmName = folderName;
+                }
+
+                const props = { name: pmName, folder: folderName };
+
+                // Extract ExtendedData attributes
                 Array.from(pm.querySelectorAll("Data, SimpleData")).forEach(d => {
                     const name = d.getAttribute("name");
                     const val = d.querySelector("value") ? d.querySelector("value").textContent : d.textContent;
                     if (name) props[name] = val;
                 });
 
-                const coords = coordEl.textContent.trim().split(/\s+/).map(p => {
-                    return p.split(",").map(Number);
-                }).filter(c => !isNaN(c[0]) && !isNaN(c[1]));
+                // Extract all coordinates (handles LineString, Point, & MultiGeometry)
+                const coordElements = Array.from(pm.getElementsByTagName("coordinates"));
+                if (coordElements.length === 0) return;
 
-                if (coords.length === 0) return null;
+                coordElements.forEach(coordEl => {
+                    const rawText = coordEl.textContent.trim();
+                    if (!rawText) return;
 
-                return { 
-                    type: "Feature", 
-                    properties: props, 
-                    geometry: coords.length === 1 ? { type: "Point", coordinates: coords[0] } : { type: "LineString", coordinates: coords } 
-                };
-            }).filter(Boolean);
+                    const coords = rawText.split(/\s+/).map(p => {
+                        const parts = p.split(",").map(Number);
+                        return [parts[0], parts[1]];
+                    }).filter(c => !isNaN(c[0]) && !isNaN(c[1]));
+
+                    if (coords.length === 0) return;
+
+                    features.push({
+                        type: "Feature",
+                        properties: props,
+                        geometry: coords.length === 1 
+                            ? { type: "Point", coordinates: coords[0] } 
+                            : { type: "LineString", coordinates: coords }
+                    });
+                });
+            });
+
+            return features;
         }
 
-        function updateMap() {
-            if (!kmlData) return;
-            
-            if (!geoJsonLayer) {
-                geoJsonLayer = L.geoJSON(kmlData, {
+        // Custom Leaflet DivIcon for Substation Symbol
+        function createSubstationIcon() {
+            const svgIcon = `
+                <div class="substation-marker-pin" style="--substation-color: ${SUBSTATION_COLOR};">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${SUBSTATION_BORDER_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                </div>`;
+            return L.divIcon({
+                html: svgIcon,
+                className: 'substation-icon-container',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16],
+                popupAnchor: [0, -16]
+            });
+        }
+
+        // Independent Loader for pbs_info.kml
+        async function loadStaticLandmarks() {
+            try {
+                const res = await fetch(KML_LANDMARKS_URL);
+                if (!res.ok) return;
+                const xmlText = await res.text();
+                const features = parseKmlXml(xmlText);
+
+                const landmarkLayer = L.geoJSON(features, {
+                    pointToLayer: (f, latlng) => L.marker(latlng, { icon: createSubstationIcon() }),
+                    style: {
+                        color: SUBSTATION_COLOR,
+                        weight: 4,
+                        opacity: 0.85
+                    },
+                    onEachFeature: (f, l) => {
+                        const nameStr = f.properties.name || "Substation Landmark";
+                        l.bindPopup(buildStaticPopup(f.properties, nameStr));
+                    }
+                }).addTo(map);
+
+                layerControl.addOverlay(landmarkLayer, "🏛️ Substation Landmarks (pbs_info)");
+            } catch (err) {
+                console.error("Failed to load static landmarks:", err);
+            }
+        }
+
+        // Dynamic Loader for test.kml connected to Firebase
+        async function loadDynamicFeeders() {
+            try {
+                const res = await fetch(KML_FEEDER_URL);
+                if (!res.ok) return;
+                const xmlText = await res.text();
+                feederKmlData = parseKmlXml(xmlText);
+                updateDynamicLayer();
+            } catch (err) {
+                console.error("Failed to load dynamic feeders:", err);
+            }
+        }
+
+        function updateDynamicLayer() {
+            if (!feederKmlData || feederKmlData.length === 0) return;
+
+            if (!feederGeoJsonLayer) {
+                feederGeoJsonLayer = L.geoJSON(feederKmlData, {
                     style: f => getStyle(f),
                     pointToLayer: (f, latlng) => L.circleMarker(latlng, getMarkerOptions(f)),
                     onEachFeature: (f, l) => {
@@ -500,23 +651,21 @@
                         const bundle = getFeederBundle(nameStr);
                         const online = isBundleOnline(bundle);
                         const tags = getTags(bundle);
-                        
-                        // Attach popup directly to every feeder line and point
-                        l.bindPopup(buildPopup(f.properties, nameStr, online, tags));
+
+                        l.bindPopup(buildDynamicPopup(f.properties, nameStr, online, tags));
                     }
                 }).addTo(map);
 
-                layerControl.addOverlay(geoJsonLayer, "⚡ 96 Feeders & Lines");
+                layerControl.addOverlay(feederGeoJsonLayer, "⚡ Feeder Lines (test.kml)");
             } else {
-                geoJsonLayer.eachLayer(l => {
+                feederGeoJsonLayer.eachLayer(l => {
                     const f = l.feature;
                     if (!f) return;
                     const nameStr = f.properties.name || "";
                     const bundle = getFeederBundle(nameStr);
                     const online = isBundleOnline(bundle);
                     const tags = getTags(bundle);
-                                
-                    // Update dynamic line colors and widths across all 96 polyline features
+
                     if (l.setStyle) {
                         if (f.geometry.type === "Point") {
                             l.setStyle(getMarkerOptions(f));
@@ -524,26 +673,24 @@
                             l.setStyle(getStyle(f));
                         }
                     }
-                    
-                    // Keep popup details updated during real-time updates
-                    l.setPopupContent(buildPopup(f.properties, nameStr, online, tags));
+
+                    l.setPopupContent(buildDynamicPopup(f.properties, nameStr, online, tags));
                 });
             }
         }
 
-        // Line styling applied to all 96 feeder polylines
         function getStyle(f) {
             const nameStr = f.properties.name || "";
             const bundle = getFeederBundle(nameStr);
             const online = isBundleOnline(bundle);
             const tags = getTags(bundle);
-            
+
             return { 
                 color: getColor(tags, online), 
-                weight: 5,           // Visible line width
-                opacity: 0.9,         // High contrast against satellite/map background
-                lineCap: 'round',
-                lineJoin: 'round'
+                weight: 5, 
+                opacity: 0.9, 
+                lineCap: 'round', 
+                lineJoin: 'round' 
             };
         }
 
@@ -552,29 +699,18 @@
             const bundle = getFeederBundle(nameStr);
             const online = isBundleOnline(bundle);
             const tags = getTags(bundle);
-            return { radius: 6, color: getColor(tags, online), fillOpacity: 0.9 };
+            return { radius: 7, color: '#1f2937', fillColor: getColor(tags, online), fillOpacity: 0.9, weight: 2 };
         }
 
         async function init() {
-            try {
-                const feederRes = await fetch(KML_FEEDER_URL);
-                if (!feederRes.ok) throw new Error("Could not fetch KML file.");
+            loadStaticLandmarks();
+            await loadFirebase();
+            await loadDynamicFeeders();
 
-                const feederXmlText = await feederRes.text();
-                kmlData = parseKmlXml(feederXmlText);
-
-                await loadFirebase();
-                updateMap();
-
-                // Periodic status refresh
-                setInterval(async () => { 
-                    await loadFirebase(); 
-                    updateMap(); 
-                }, 30000);
-
-            } catch (err) {
-                console.error("Initialization failed:", err);
-            }
+            setInterval(async () => { 
+                await loadFirebase(); 
+                updateDynamicLayer(); 
+            }, 30000);
         }
 
         init();
