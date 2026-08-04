@@ -316,7 +316,7 @@
                         <li>2. Increase lineman safety.</li>
                         <li>3. Auto SAIDI/SAIFI calculation.</li>
                         <li>4. Feeder History with fault reason.</li>
-                        <li>5. Monitor substation real time Power,Poltage,Current,PF,Frequency.</li>
+                        <li>5. Monitor substation real time Power,Voltage,Current,PF,Frequency.</li>
                         <li>6. Daily LSI Report.</li>
                         <li>7. GIS VIEW.</li>
                     </ul>
@@ -577,7 +577,15 @@
             const dispEmail = document.getElementById('user-display-email');
             const dispDesig = document.getElementById('user-display-designation');
 
-            if (badgeUser) badgeUser.textContent = currentUser.name ? currentUser.name.split(' ')[0] : 'User';
+           if (badgeUser) {
+    if (currentUser.name) {
+        // Splits by whitespace, takes up to the first 2 words, and joins them back
+        const nameWords = currentUser.name.trim().split(/\s+/);
+        badgeUser.textContent = nameWords.slice(0, 2).join(' ');
+    } else {
+        badgeUser.textContent = 'User';
+    }
+}
             if (dispName) dispName.innerHTML = `<i data-lucide="user-check" size="16"></i> ${currentUser.name || ''}`;
             if (dispPbs) dispPbs.innerHTML = `<i data-lucide="building-2" size="14"></i> PBS: ${currentUser.pbs || ''}`;
             if (dispPhone) dispPhone.innerHTML = `<i data-lucide="phone" size="14"></i> Phone: ${currentUser.phone || ''}`;
