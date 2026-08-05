@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>GIS Feeder Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.css" />
+    <style>
+        * { box-sizing: border-box; }
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden; 
+            background: #111;
+        }
+
+        /* 3D Perspective Outer Wrapper */
+        #map-wrapper {
+            width: 100vw;
+            height: 100vh;
+            perspective: 1200px;
+            overflow: hidden;
+            position: relative;
+            background: #111;
+        }
+
+        #map { 
+            height: 100%; 
+            width: 100%; 
+            transition: transform 0.4s ease-out;
+            transform-origin: 50% 50%;
+        }
+
+        /* Prevent Leaflet Controls from being skewed/hidden by 3D transform */
+        .leaflet-control-container {
+            position: absolute !important;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2000 !important;
+        }
+        
+        .leaflet-control {
+            pointer-events: auto;
+        }
+
+        /* =========================================================
+           LAYOUT OVERLAP FIX FOR TOP-RIGHT CONTROLS
+           Shift standard Leaflet control stack down below Compass/3D widget
+           ========================================================= */
+        .leaflet-top.leaflet-right {
+            margin-top: 155px !important;
+            margin-right: 12px !important;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        .leaflet-top.leaflet-right .leaflet-control {
+            margin: 0 !important;
+        }
+
+        /* =========================================================
+           Search Widget Overlay (Left Side)
+           ========================================================= */
+        .feeder-search-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 2001;
+            width: 180px;
+            font-family: system-ui, -apple-system, sans-serif;
+            pointer-events: auto;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(8px);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        .search-input-wrapper input {
+            width: 100%;
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .search-input-wrapper input::placeholder {
+            color: #94a3b8;
+        }
+
+        .clear-search-btn {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0 10px;
+            display: none;
+        }
+        .clear-search-btn:hover { color: #ffffff; }
+
+        .search-results-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 6px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            display: none;
+            z-index: 2002;
+        }
+
+        .search-result-item {
+            padding: 9px 12px;
+            color: #e2e8f0;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .search-result-item:hover {
+            background: #2563eb;
+            color: #ffffff;
+        }
+
+        .measure-btn {
+            background: white;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-weight: bold;
+            font-family: sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+        }
+        .measure-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        /* Navigation Widget */
+        .ge-nav-widget {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 2001;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+        }
+
+        /* Compass Ring */
+        .compass-ring {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.85);
+            background: rgba(60, 60, 60, 0.75);
+            backdrop-filter: blur(8px);
+            position: relative;
+            cursor: grab;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .compass-ring:hover { border-color: #ffffff; background: rgba(75, 75, 75, 0.85); }
+        .compass-ring:active { cursor: grabbing; }
+
+        .compass-inner {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1px dashed rgba(255, 255, 255, 0.6);
+            position: absolute;
+            top: 13px;
+            left: 13px;
+            pointer-events: none;
+        }
+
+        /* North Pointer Badge */
+        .north-pointer {
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ffffff;
+            color: #111111;
+            font-weight: 900;
+            font-family: sans-serif;
+            font-size: 11px;
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            cursor: pointer;
+        }
+
+        /* View Switcher */
+        .view-change-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.85);
+            background: rgba(60, 60, 60, 0.75);
+            backdrop-filter: blur(8px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+            transition: background 0.2s, border-color 0.2s, transform 0.2s;
+        }
+        .view-change-btn:hover { 
+            background: rgba(85, 85, 85, 0.9);
+            border-color: #ffffff;
+            transform: scale(1.04);
+        }
+        .view-change-btn.active {
+            background: #2563eb;
+            border-color: #60a5fa;
+        }
+
+        /* Custom Substation Marker & Label Styling */
+        .substation-icon-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .substation-marker-pin {
+            width: 38px;
+            height: 28px;
+            background: #ffffff;
+            border: 2px solid var(--substation-border-color, #dc2626);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 2px;
+            transition: transform 0.2s ease;
+        }
+        .substation-marker-pin:hover {
+            transform: scale(1.15);
+        }
+        .substation-label {
+            margin-top: 4px;
+            background: rgba(15, 23, 42, 0.88);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 2px 7px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.4);
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        /* Animated Pulse Marker on Feeder Touch */
+        .touch-pulse-ring {
+            width: 26px;
+            height: 26px;
+            border: 3px solid #ffb703;
+            background: rgba(255, 183, 3, 0.4);
+            border-radius: 50%;
+            box-shadow: 0 0 14px #ffb703, 0 0 28px #fb8500;
+            animation: pulseGlow 1.2s infinite ease-in-out;
+        }
+        @keyframes pulseGlow {
+            0% { transform: scale(0.8); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.5; }
+            100% { transform: scale(0.8); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="map-wrapper">
+        <div id="map"></div>
+
+        <!-- Feeder Search Control -->
+        <div class="feeder-search-container">
+            <div class="search-input-wrapper">
+                <input type="text" id="feederSearchInput" placeholder="🔍 Search Feeder " autocomplete="off" />
+                <button class="clear-search-btn" id="clearSearchBtn" title="Clear search">✕</button>
+            </div>
+            <div class="search-results-dropdown" id="searchResultsDropdown"></div>
+        </div>
+
+        <div class="ge-nav-widget">
+            <div class="compass-ring" id="compassRing" title="Drag ring to rotate 360° or click N to reset North">
+                <div class="north-pointer" id="northBadge">N</div>
+                <div class="compass-inner"></div>
+            </div>
+
+            <div class="view-change-btn" id="viewChangeBtn" title="Toggle 2D / 3D Perspective View">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 12l10 5 10-5"/>
+                    <path d="M2 17l10 5 10-5"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js" charset="utf-8"></script>
+    <script>
+        // =========================================================
+        // CONFIGURATION: Substation & Feeder Customization
+        // =========================================================
+        const SUBSTATION_COLOR = "#dc2626";        // Existing Grid S/S Primary Color (Red)
+        const SUBSTATION_BORDER_COLOR = "#dc2626"; // Box Border Color (Red)
+        
+        // Highlight Color Settings for Grouped Feeders
+        const HIGHLIGHT_COLOR = "#ffb703";        // Neon Amber / Bright Gold
+        const HIGHLIGHT_WEIGHT = 10;              // Line thickness when selected
+
+        // 1. Tile Layers
+        const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        });
+
+        const satelliteImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Tiles © Esri'
+        });
+
+        const satelliteRoads = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            pane: 'shadowPane'
+        });
+
+        const satellitePlaces = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            pane: 'shadowPane'
+        });
+
+        const baseMaps = {
+            "Standard Map": standardLayer,
+            "Satellite View": satelliteImagery
+        };
+
+        const overlayMaps = {
+            "Roads Overlay": satelliteRoads,
+            "Place Names & Boundaries": satellitePlaces
+        };
+
+        const map = L.map('map', {
+            center: [24.7936, 88.9318],
+            zoom: 11,
+            zoomControl: false,
+            layers: [standardLayer]
+        });
+
+        const mapWrapper = document.getElementById('map-wrapper');
+        const controlContainer = document.querySelector('.leaflet-control-container');
+        if (controlContainer && mapWrapper) {
+            mapWrapper.appendChild(controlContainer);
+        }
+
+        // Add standard controls sequentially to top-right
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        const layerControl = L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
+
+        L.control.locate({
+            position: 'topright',
+            strings: { title: "Show my location" },
+            locateOptions: { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+            showPopup: false
+        }).addTo(map);
+
+        // Measuring Tool
+        let measureActive = false;
+        let measurePoints = [];
+        let measureMarkers = [];
+        let measureLine = null;
+        let measurePopup = L.popup();
+
+        const MeasureControl = L.Control.extend({
+            options: { position: 'topright' },
+            onAdd: function (map) {
+                const container = L.DomUtil.create('div', 'leaflet-bar');
+                const btn = L.DomUtil.create('button', 'measure-btn', container);
+                btn.innerHTML = '📏 Measure';
+                L.DomEvent.disableClickPropagation(btn);
+                L.DomEvent.on(btn, 'click', function() {
+                    measureActive = !measureActive;
+                    if (measureActive) {
+                        btn.classList.add('active');
+                        btn.innerHTML = '📏 Measuring...';
+                        clearMeasurement();
+                    } else {
+                        btn.classList.remove('active');
+                        btn.innerHTML = '📏 Measure';
+                        clearMeasurement();
+                    }
+                });
+                return container;
+            }
+        });
+        map.addControl(new MeasureControl());
+
+        map.on('click', function(e) {
+            if (!measureActive) return;
+            measurePoints.push(e.latlng);
+            const marker = L.circleMarker(e.latlng, { radius: 5, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 1 }).addTo(map);
+            measureMarkers.push(marker);
+
+            if (measurePoints.length > 1) {
+                if (measureLine) map.removeLayer(measureLine);
+                measureLine = L.polyline(measurePoints, { color: '#2563eb', weight: 4, dashArray: '5, 5' }).addTo(map);
+
+                let totalDistance = 0;
+                for (let i = 0; i < measurePoints.length - 1; i++) {
+                    totalDistance += measurePoints[i].distanceTo(measurePoints[i+1]);
+                }
+
+                let distText = totalDistance > 1000 ? 
+                    (totalDistance / 1000).toFixed(2) + ' km' : 
+                    Math.round(totalDistance) + ' meters';
+
+                measurePopup.setLatLng(e.latlng)
+                    .setContent(`<b>Distance:</b> ${distText}`)
+                    .openOn(map);
+            }
+        });
+
+        function clearMeasurement() {
+            measurePoints = [];
+            measureMarkers.forEach(m => map.removeLayer(m));
+            measureMarkers = [];
+            if (measureLine) { map.removeLayer(measureLine); measureLine = null; }
+            map.closePopup(measurePopup);
+        }
+
+        // 360° Perspective View Controls
+        let is3D = false;
+        let currentRotation = 0;
+        let isDraggingCompass = false;
+        let startAngle = 0;
+
+        const mapEl = document.getElementById('map');
+        const compassRing = document.getElementById('compassRing');
+        const northBadge = document.getElementById('northBadge');
+        const viewChangeBtn = document.getElementById('viewChangeBtn');
+
+        function updateMapTransform() {
+            const pitch = is3D ? 'rotateX(55deg)' : 'rotateX(0deg)';
+            const needScale = (is3D || currentRotation !== 0);
+            const scale = needScale ? 'scale(2.2)' : 'scale(1)';
+
+            mapEl.style.transform = `${pitch} rotateZ(${currentRotation}deg) ${scale}`;
+            compassRing.style.transform = `rotate(${-currentRotation}deg)`;
+        }
+
+        viewChangeBtn.addEventListener('click', () => {
+            is3D = !is3D;
+            viewChangeBtn.classList.toggle('active', is3D);
+            updateMapTransform();
+            setTimeout(() => map.invalidateSize(), 400);
+        });
+
+        northBadge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentRotation = 0;
+            updateMapTransform();
+            setTimeout(() => map.invalidateSize(), 400);
+        });
+
+        compassRing.addEventListener('mousedown', (e) => {
+            isDraggingCompass = true;
+            const rect = compassRing.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDraggingCompass) return;
+            const rect = compassRing.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+            const delta = currentAngle - startAngle;
+
+            currentRotation = (currentRotation + delta) % 360;
+            startAngle = currentAngle;
+            updateMapTransform();
+        });
+
+        window.addEventListener('mouseup', () => { 
+            if (isDraggingCompass) {
+                isDraggingCompass = false;
+                map.invalidateSize();
+            }
+        });
+
+        // Target Endpoints
+        const KML_LANDMARKS_URL = "https://raw.githubusercontent.com/shantosaha23-ops/gisdashboard/refs/heads/main/pbs_info.kml";
+        const KML_FEEDER_URL = "https://raw.githubusercontent.com/shantosaha23-ops/gisdashboard/refs/heads/main/test.kml";
+        const FIREBASE_URL = "https://allpbs-f3b0c-default-rtdb.asia-southeast1.firebasedatabase.app/.json";
+
+        let firebaseData = {};
+        let feederGeoJsonLayer = null;
+        let feederKmlData = [];
+        let availableFeederNames = new Set();
+        
+        // Group Selection Tracking State
+        let selectedFeederGroup = []; 
+        let touchPulseMarker = null;
+
+        async function loadFirebase() {
+            try {
+                const res = await fetch(FIREBASE_URL);
+                firebaseData = await res.json() || {};
+            } catch(e) { console.log("Firebase load error:", e); }
+        }
+
+        function getFeederIDs(name) {
+            if (!name) return [];
+            return name.split('/').map(part => {
+                const clean = part.toUpperCase().replace(/[^A-Z0-9-]/g, "_");
+                const segments = clean.split(/[-_]/).filter(Boolean);
+                return segments.slice(0, 2).join("_");
+            }).filter(Boolean);
+        }
+
+        function findDevice(targetID) {
+            if (!targetID || !firebaseData) return null;
+            for (const pbs in firebaseData) {
+                if (typeof firebaseData[pbs] !== 'object') continue;
+                for (const sub in firebaseData[pbs]) {
+                    const devs = firebaseData[pbs][sub];
+                    if (!devs) continue;
+                    for (const dev in devs) {
+                        const d = devs[dev];
+                        if (d) {
+                            for (const k in d) {
+                                const cleanKey = k.toUpperCase().replace(/[^A-Z0-9-]/g, "_").split(/[-_]/).filter(Boolean).slice(0, 2).join("_");
+                                if (cleanKey === targetID) return { parent: d, node: d[k] };
+                            }
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        function getFeederBundle(name) {
+            const ids = getFeederIDs(name);
+            let devices = [];
+            ids.forEach(id => {
+                const dev = findDevice(id);
+                devices.push({ id: id, device: dev });
+            });
+            return devices;
+        }
+
+        function isBundleOnline(bundle) {
+            if (!bundle.length) return false;
+            return bundle.some(b => {
+                if (!b.device || !b.device.parent) return false;
+                let hb = b.device.parent.lastHeartbeat || b.device.parent.heartbeat || b.device.parent.status?.lastHeartbeat;
+                hb = Number(hb);
+                if (isNaN(hb)) return false;
+                if (hb < 1e12) hb *= 1000;
+                return (Date.now() - hb) <= 120000;
+            });
+        }
+
+        function getTags(bundle) {
+            let tags = [];
+            bundle.forEach(b => {
+                if (b.device && b.device.node) {
+                    tags.push({ name: b.id, status: b.device.node.status });
+                }
+            });
+            return tags;
+        }
+
+        function getColor(tags, online) {
+            if (!online) return "#2563eb"; // Offline
+            let on = 0, off = 0;
+            tags.forEach(t => { 
+                if (t.status === "ON") on++;
+                if (t.status === "OFF") off++;
+            });
+            if (on && off) return "#f59e0b"; // Mixed status
+            return off ? "#ef4444" : "#d946ef"; // OFF vs ON
+        }
+
+        function buildDynamicPopup(props, nameStr, online, tags) {
+            let html = `<div style="font-family:sans-serif;font-size:13px;min-width:220px;">
+                <div style="background:#1f2937;color:white;padding:8px;text-align:center;font-weight:bold;border-radius:4px 4px 0 0;">${nameStr || "Feeder Line"}</div>
+                <div style="text-align:center;margin:10px;"><span style="padding:4px 12px;border-radius:15px;color:white;font-weight:bold;background:${online ? '#22c55e' : '#6b7280'}">${online ? "ONLINE" : "OFFLINE"}</span></div>`;
+            if (tags.length) {
+                html += `<div style="margin-bottom:8px;"><b>Feeder Status:</b><br>${tags.map(t => {
+                    if (!online) {
+                        return `${t.name}: <b style="color:#6b7280">---</b>`;
+                    }
+                    const statusColor = t.status === 'ON' ? '#16a34a' : (t.status === 'OFF' ? '#dc2626' : '#6b7280');
+                    return `${t.name}: <b style="color:${statusColor}">${t.status || '---'}</b>`;
+                }).join("<br>")}</div>`;
+            }
+            return html + `</div>`;
+        }
+
+        function buildStaticPopup(props, nameStr) {
+            let html = `<div style="font-family:sans-serif;font-size:13px;min-width:220px;">
+                <div style="background:${SUBSTATION_COLOR};color:white;padding:8px;text-align:center;font-weight:bold;border-radius:4px 4px 0 0;">⚡ ${nameStr || "Substation Landmark"}</div>
+                <div style="padding:8px;">`;
+            html += `<table style="font-size:12px;width:100%;">`;
+            for (const k in props) {
+                if (k !== "name" && props[k]) {
+                    html += `<tr><td style="font-weight:bold;padding:2px 0;">${k}</td><td>: ${props[k]}</td></tr>`;
+                }
+            }
+            return html + `</table></div></div>`;
+        }
+
+        function parseKmlXml(xmlText) {
+            const xml = new DOMParser().parseFromString(xmlText, "text/xml");
+            return Array.from(xml.getElementsByTagName("Placemark")).map(pm => {
+                const coordEl = pm.getElementsByTagName("coordinates")[0];
+                if (!coordEl || !coordEl.textContent) return null;
+
+                const props = { name: pm.getElementsByTagName("name")[0]?.textContent || "" };
+                Array.from(pm.querySelectorAll("Data, SimpleData")).forEach(d => {
+                    const name = d.getAttribute("name");
+                    const val = d.querySelector("value") ? d.querySelector("value").textContent : d.textContent;
+                    if (name) props[name] = val;
+                });
+
+                const coords = coordEl.textContent.trim().split(/\s+/).map(p => {
+                    return p.split(",").map(Number);
+                }).filter(c => !isNaN(c[0]) && !isNaN(c[1]));
+
+                if (coords.length === 0) return null;
+
+                return { 
+                    type: "Feature", 
+                    properties: props, 
+                    geometry: coords.length === 1 ? { type: "Point", coordinates: coords[0] } : { type: "LineString", coordinates: coords } 
+                };
+            }).filter(Boolean);
+        }
+
+        // Custom Substation Icon matching BREB/Grid Legend Symbol (Box + 3 Peaks)
+        function createSubstationIcon(nameStr) {
+            const svgIcon = `
+                <div class="substation-icon-container">
+                    <div class="substation-marker-pin" style="--substation-border-color: ${SUBSTATION_BORDER_COLOR};">
+                        <svg width="32" height="20" viewBox="0 0 32 20" fill="none">
+                            <!-- Bottom Horizontal Baseline -->
+                            <line x1="2" y1="18" x2="30" y2="18" stroke="${SUBSTATION_COLOR}" stroke-width="2"/>
+                            <!-- 3 Solid Triangular Sawtooth Peaks -->
+                            <polygon points="3,18 7,8 11,18" fill="${SUBSTATION_COLOR}" />
+                            <polygon points="12,18 16,8 20,18" fill="${SUBSTATION_COLOR}" />
+                            <polygon points="21,18 25,8 29,18" fill="${SUBSTATION_COLOR}" />
+                        </svg>
+                    </div>
+                    ${nameStr ? `<div class="substation-label">${nameStr}</div>` : ''}
+                </div>`;
+            
+            return L.divIcon({
+                html: svgIcon,
+                className: '',
+                iconSize: [120, 60],
+                iconAnchor: [60, 14],
+                popupAnchor: [0, -18]
+            });
+        }
+
+        // Independent Loader for pbs_info.kml with Custom Symbol, Name Labels & Color
+        async function loadStaticLandmarks() {
+            try {
+                const res = await fetch(KML_LANDMARKS_URL);
+                if (!res.ok) return;
+                const xmlText = await res.text();
+                const features = parseKmlXml(xmlText);
+
+                const landmarkLayer = L.geoJSON(features, {
+                    pointToLayer: (f, latlng) => {
+                        const nameStr = f.properties.name || "Substation";
+                        return L.marker(latlng, { icon: createSubstationIcon(nameStr) });
+                    },
+                    style: {
+                        color: SUBSTATION_COLOR,
+                        weight: 4,
+                        opacity: 0.85
+                    },
+                    onEachFeature: (f, l) => {
+                        const nameStr = f.properties.name || "Substation Landmark";
+                        l.bindPopup(buildStaticPopup(f.properties, nameStr));
+                    }
+                }).addTo(map);
+
+                layerControl.addOverlay(landmarkLayer, "🏛️ Substation Landmarks");
+            } catch (err) {
+                console.error("Failed to load static landmarks:", err);
+            }
+        }
+
+        // Reset previous Feeder Group highlight
+        function resetFeederGroupSelection() {
+            if (selectedFeederGroup.length > 0) {
+                selectedFeederGroup.forEach(l => {
+                    const f = l.feature;
+                    if (f && l.setStyle) {
+                        l.setStyle(getStyle(f));
+                    }
+                });
+                selectedFeederGroup = [];
+            }
+            if (touchPulseMarker) {
+                map.removeLayer(touchPulseMarker);
+                touchPulseMarker = null;
+            }
+        }
+
+        // Highlight Feeder by Name (Used by touch and search select)
+        function selectFeederByName(targetName, zoomToFit = false) {
+            resetFeederGroupSelection();
+            if (!targetName || !feederGeoJsonLayer) return;
+
+            const cleanTarget = targetName.trim().toUpperCase();
+            let bounds = L.latLngBounds();
+
+            feederGeoJsonLayer.eachLayer(l => {
+                const layerName = (l.feature?.properties?.name || "").trim().toUpperCase();
+                if (layerName === cleanTarget) {
+                    selectedFeederGroup.push(l);
+                    if (l.setStyle) {
+                        l.setStyle({
+                            color: HIGHLIGHT_COLOR,
+                            weight: HIGHLIGHT_WEIGHT,
+                            opacity: 1
+                        });
+                    }
+                    if (l.bringToFront) l.bringToFront();
+
+                    if (l.getBounds) {
+                        bounds.extend(l.getBounds());
+                    } else if (l.getLatLng) {
+                        bounds.extend(l.getLatLng());
+                    }
+                }
+            });
+
+            if (zoomToFit && bounds.isValid()) {
+                map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 1 });
+            }
+        }
+
+        // Dynamic Loader for test.kml connected to Firebase
+        async function loadDynamicFeeders() {
+            try {
+                const res = await fetch(KML_FEEDER_URL);
+                if (!res.ok) return;
+                const xmlText = await res.text();
+                feederKmlData = parseKmlXml(xmlText);
+
+                // Populate search list of feeder names
+                availableFeederNames.clear();
+                feederKmlData.forEach(f => {
+                    if (f.properties?.name) {
+                        availableFeederNames.add(f.properties.name.trim());
+                    }
+                });
+
+                updateDynamicLayer();
+            } catch (err) {
+                console.error("Failed to load dynamic feeders:", err);
+            }
+        }
+
+        function updateDynamicLayer() {
+            if (!feederKmlData || feederKmlData.length === 0) return;
+
+            if (!feederGeoJsonLayer) {
+                feederGeoJsonLayer = L.geoJSON(feederKmlData, {
+                    style: f => getStyle(f),
+                    pointToLayer: (f, latlng) => L.circleMarker(latlng, getMarkerOptions(f)),
+                    onEachFeature: (f, l) => {
+                        const nameStr = f.properties.name || "";
+                        const bundle = getFeederBundle(nameStr);
+                        const online = isBundleOnline(bundle);
+                        const tags = getTags(bundle);
+
+                        l.bindPopup(buildDynamicPopup(f.properties, nameStr, online, tags));
+
+                        // ALL POLYLINE GROUP HIGHLIGHT LOGIC ON TOUCH/CLICK
+                        l.on('click', function(e) {
+                            if (measureActive) return;
+
+                            const targetName = (l.feature?.properties?.name || "").trim();
+                            selectFeederByName(targetName, false);
+
+                            // Drop an animated pulse marker at touch position
+                            const pulseIcon = L.divIcon({
+                                className: 'touch-pulse-ring',
+                                iconSize: [26, 26],
+                                iconAnchor: [13, 13]
+                            });
+                            touchPulseMarker = L.marker(e.latlng, { icon: pulseIcon, interactive: false }).addTo(map);
+
+                            L.DomEvent.stopPropagation(e);
+                        });
+                    }
+                }).addTo(map);
+
+                layerControl.addOverlay(feederGeoJsonLayer, "⚡ Feeder Lines ");
+            } else {
+                feederGeoJsonLayer.eachLayer(l => {
+                    const f = l.feature;
+                    if (!f) return;
+                    const nameStr = f.properties.name || "";
+                    const bundle = getFeederBundle(nameStr);
+                    const online = isBundleOnline(bundle);
+                    const tags = getTags(bundle);
+
+                    // Skip re-styling currently highlighted group during polling
+                    if (!selectedFeederGroup.includes(l) && l.setStyle) {
+                        if (f.geometry.type === "Point") {
+                            l.setStyle(getMarkerOptions(f));
+                        } else {
+                            l.setStyle(getStyle(f));
+                        }
+                    }
+
+                    l.setPopupContent(buildDynamicPopup(f.properties, nameStr, online, tags));
+                });
+            }
+        }
+
+        // =========================================================
+        // SEARCH INPUT LOGIC & AUTOCOMPLETE
+        // =========================================================
+        const searchInput = document.getElementById('feederSearchInput');
+        const clearBtn = document.getElementById('clearSearchBtn');
+        const searchDropdown = document.getElementById('searchResultsDropdown');
+
+        searchInput.addEventListener('input', function() {
+            const val = this.value.trim().toUpperCase();
+            clearBtn.style.display = val ? 'block' : 'none';
+
+            if (!val) {
+                searchDropdown.style.display = 'none';
+                resetFeederGroupSelection();
+                return;
+            }
+
+            const matches = Array.from(availableFeederNames)
+                .filter(name => name.toUpperCase().includes(val))
+                .sort();
+
+            if (matches.length === 0) {
+                searchDropdown.innerHTML = `<div class="search-result-item" style="color:#94a3b8;">No matching feeder found</div>`;
+            } else {
+                searchDropdown.innerHTML = matches.map(m => `
+                    <div class="search-result-item" data-name="${m}">
+                        <span>⚡ ${m}</span>
+                    </div>
+                `).join('');
+            }
+
+            searchDropdown.style.display = 'block';
+        });
+
+        searchDropdown.addEventListener('click', function(e) {
+            const item = e.target.closest('.search-result-item');
+            if (!item) return;
+
+            const name = item.getAttribute('data-name');
+            if (name) {
+                searchInput.value = name;
+                searchDropdown.style.display = 'none';
+                clearBtn.style.display = 'block';
+                selectFeederByName(name, true);
+            }
+        });
+
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            clearBtn.style.display = 'none';
+            searchDropdown.style.display = 'none';
+            resetFeederGroupSelection();
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.feeder-search-container')) {
+                searchDropdown.style.display = 'none';
+            }
+        });
+
+        // Reset group selection when tapping map background
+        map.on('click', function() {
+            if (!measureActive) {
+                resetFeederGroupSelection();
+                searchDropdown.style.display = 'none';
+            }
+        });
+
+        function getStyle(f) {
+            const nameStr = f.properties.name || "";
+            const bundle = getFeederBundle(nameStr);
+            const online = isBundleOnline(bundle);
+            const tags = getTags(bundle);
+
+            return { 
+                color: getColor(tags, online), 
+                weight: 5, 
+                opacity: 0.9, 
+                lineCap: 'round', 
+                lineJoin: 'round' 
+            };
+        }
+
+        function getMarkerOptions(f) {
+            const nameStr = f.properties.name || "";
+            const bundle = getFeederBundle(nameStr);
+            const online = isBundleOnline(bundle);
+            const tags = getTags(bundle);
+            return { radius: 7, color: '#1f2937', fillColor: getColor(tags, online), fillOpacity: 0.9, weight: 2 };
+        }
+
+        async function init() {
+            // Load independent static landmarks once
+            loadStaticLandmarks();
+
+            // Load dynamic feeders and bind to Firebase interval polling
+            await loadFirebase();
+            await loadDynamicFeeders();
+
+            setInterval(async () => { 
+                await loadFirebase(); 
+                updateDynamicLayer(); 
+            }, 30000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
