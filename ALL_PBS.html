@@ -370,7 +370,7 @@ async function refreshDashboard() { await loadAll(); }
 refreshDashboard();
 
 // Periodic Background Updates (Firebase every 30s, Apps Script every 60s)
-setInterval(loadRealtimeFirebase, 30000);
+setInterval(loadRealtimeFirebase, 40000);
 setInterval(loadAppsScriptData, 60000);
 </script>
 </body>
