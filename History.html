@@ -11,8 +11,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         
     <!-- SheetJS & html2pdf -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" async></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" async></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         :root {
@@ -132,6 +132,135 @@
         @media (max-width: 600px) { 
             .remarks-col { display: none; } 
         }
+
+        #pdfExportWrapper {
+            display: none;
+        }
+
+        .pdf-template {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #1a202c;
+            padding: 20px;
+            background: #ffffff;
+        }
+
+        .pdf-header {
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+
+        .pdf-title {
+            color: #0056b3;
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .pdf-subtitle {
+            font-size: 11px;
+            color: #4a5568;
+            margin-top: 4px;
+        }
+
+        .pdf-meta-grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 11px;
+        }
+
+        .pdf-meta-col {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+
+        .pdf-kpi-container {
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .pdf-kpi-card {
+            display: table-cell;
+            width: 49%;
+            background: #ebf8ff;
+            border: 1px solid #bee3f8;
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .pdf-kpi-val {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2b6cb0;
+        }
+
+        .pdf-kpi-lbl {
+            font-size: 9px;
+            color: #4a5568;
+            text-transform: uppercase;
+        }
+
+        .pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+
+        .pdf-table th {
+            background-color: #0056b3 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 6px 8px;
+            border: 1px solid #004494;
+            text-align: left;
+        }
+
+        .pdf-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            border-right: 1px solid #edf2f7;
+            border-left: 1px solid #edf2f7;
+        }
+
+        .pdf-table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .pdf-table tr {
+            page-break-inside: avoid;
+        }
+
+        .pdf-badge {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .pdf-badge-off { background-color: #fed7d7; color: #9b2c2c; }
+        .pdf-badge-on { background-color: #c6f6d5; color: #22543d; }
+
+        .pdf-footer {
+            margin-top: 25px;
+            padding-top: 10px;
+            border-top: 1px solid #e2e8f0;
+            display: table;
+            width: 100%;
+            font-size: 9px;
+            color: #718096;
+        }
     </style>
 </head>
 <body>
@@ -192,12 +321,12 @@
                         </button>
                     </div>
                     <div class="col-3">
-                        <button class="btn btn-success btn-sm w-100 fw-semibold" onclick="exportToExcel()" title="Export Excel">
+                        <button class="btn btn-success btn-sm w-100 fw-semibold" onclick="exportToExcel()" title="Export Excel Statement">
                             <i class="fa-solid fa-file-excel"></i>
                         </button>
                     </div>
                     <div class="col-3">
-                        <button class="btn btn-danger btn-sm w-100 fw-semibold" onclick="exportToPDF()" title="Export PDF">
+                        <button class="btn btn-danger btn-sm w-100 fw-semibold" onclick="exportToPDF()" title="Export PDF Statement">
                             <i class="fa-solid fa-file-pdf"></i>
                         </button>
                     </div>
@@ -233,6 +362,9 @@
         </div>
     </div>
 
+    <!-- Hidden Printable Template Container for PDF Export -->
+    <div id="pdfExportWrapper"></div>
+
     <script>
         const EXEC_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec";
         const LOG_BASE_URL = `${EXEC_URL}?mode=history_log`;
@@ -250,26 +382,21 @@
         async function init() {
             setTodayDefaultDates();
             
-            // 1. Restore cached feeder list from localStorage
-            const cached = localStorage.getItem('FEEDER_MASTER_CACHE');
-            if (cached) {
-                try { 
+            try {
+                const cached = localStorage.getItem('FEEDER_MASTER_CACHE');
+                if (cached) {
                     REGISTERED_FEEDERS = JSON.parse(cached); 
                     updateCascadingDropdowns();
-                } catch(e){}
+                }
+            } catch(e) {
+                console.warn("Storage access restricted:", e);
             }
 
-            // 2. Fetch all historical feeder IDs
             await syncMasterFeederList();
-
-            // 3. Render dropdowns with full feeder list
             updateCascadingDropdowns();
-
-            // 4. Fetch logs for today's date
             await fetchFilteredLogs();
         }
 
-        // Reset all filter fields back to initial default position
         async function resetFilters() {
             document.getElementById('fPBS').value = "";
             document.getElementById('fSUB').value = "";
@@ -281,17 +408,36 @@
             await fetchFilteredLogs();
         }
 
-        // Pulls logs across full historical time range so GAS returns ALL feeders ever logged
         async function syncMasterFeederList() {
+            const today = new Date();
+            const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()).toISOString().split('T')[0];
+            const todayStr = today.toISOString().split('T')[0];
+
+            let queryUrl = `${LOG_BASE_URL}&start=${oneYearAgo}&end=${todayStr}`;
+
             try {
-                const broadQueryUrl = `${LOG_BASE_URL}&start=2020-01-01&end=2099-12-31`;
-                const res = await fetch(broadQueryUrl);
-                const masterList = await res.json();
+                let res = await fetch(queryUrl);
+                let masterList = await res.json();
+                
+                if (Array.isArray(masterList) && masterList.length > 0) {
+                    harvestFeeders(masterList);
+                    return;
+                }
+            } catch (e) {
+                console.warn("1-year sync timed out. Trying 90-day fallback...", e);
+            }
+
+            try {
+                const ninetyDaysAgo = new Date(today.getTime() - (90 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+                const fallbackUrl = `${LOG_BASE_URL}&start=${ninetyDaysAgo}&end=${todayStr}`;
+                let res = await fetch(fallbackUrl);
+                let masterList = await res.json();
+
                 if (Array.isArray(masterList) && masterList.length > 0) {
                     harvestFeeders(masterList);
                 }
-            } catch (e) {
-                console.warn("Could not sync master feeder list on startup:", e);
+            } catch (err) {
+                console.warn("Feeder list fallback sync failed:", err);
             }
         }
 
@@ -320,7 +466,11 @@
             });
 
             if (updated) {
-                localStorage.setItem('FEEDER_MASTER_CACHE', JSON.stringify(REGISTERED_FEEDERS));
+                try {
+                    localStorage.setItem('FEEDER_MASTER_CACHE', JSON.stringify(REGISTERED_FEEDERS));
+                } catch(e) {
+                    console.warn("Could not save cache to local storage:", e);
+                }
                 updateCascadingDropdowns();
             }
         }
@@ -333,7 +483,6 @@
             const start = document.getElementById('fStart').value;
             const end = document.getElementById('fEnd').value;
 
-            // Loading State UI
             document.getElementById('logBody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Fetching records...</td></tr>';
             document.getElementById('cardView').innerHTML = '<div class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Fetching records...</div>';
 
@@ -491,22 +640,189 @@
             }
         }
 
-        function exportToExcel() { 
-            const table = document.getElementById('logTable');
-            const wb = XLSX.utils.table_to_book(table, { sheet: "Feeder History Log" });
-            XLSX.writeFile(wb, `Feeder_History_Log_${new Date().toISOString().slice(0,10)}.xlsx`); 
+        // Helper function to calculate total outage duration strictly for OFF -> ON events
+        function calculateTotalOffToOnOutageMinutes(records) {
+            let totalOffToOnMinutes = 0;
+            records.forEach(r => { 
+                const rawEvt = String(r.Event || "").toUpperCase();
+                const cleanEvt = rawEvt.replace(/\s+/g, '');
+                // Strictly match OFF → ON variants while excluding ON → OFF
+                if (cleanEvt.includes("OFF→ON") || cleanEvt.includes("OFF->ON") || cleanEvt.includes("OFFTOON")) {
+                    totalOffToOnMinutes += Number(r.DurationSeconds || 0) / 60; 
+                }
+            });
+            return totalOffToOnMinutes;
         }
 
+        // --- EXCEL STATEMENT GENERATOR ---
+        function exportToExcel() { 
+            const filteredData = (DATA || []).filter(r => Number(r.DurationSeconds || 0) >= 300);
+            
+            if (filteredData.length === 0) {
+                alert("No log records available to export for selected filter.");
+                return;
+            }
+
+            const pbsFilter = document.getElementById('fPBS').value || "All PBS";
+            const subFilter = document.getElementById('fSUB').value || "All SUBs";
+            const fedFilter = document.getElementById('fFed').value || "All Feeders";
+            const startVal = document.getElementById('fStart').value || "N/A";
+            const endVal = document.getElementById('fEnd').value || "N/A";
+
+            const totalOutageMinutes = calculateTotalOffToOnOutageMinutes(filteredData);
+
+            // Statement Summary Header
+            const excelRows = [
+                ["FEEDER INTERRUPTION & OPERATION STATEMENT"],
+                ["Generated On:", new Date().toLocaleString()],
+                ["Date Range:", `${startVal} to ${endVal}`],
+                ["Location Filter:", `PBS: ${pbsFilter} | SUB: ${subFilter} | Feeder: ${fedFilter}`],
+                ["Total Events:", filteredData.length, "", "Total Outage Duration (OFF → ON Only):", `${totalOutageMinutes.toFixed(1)} mins`],
+                [], 
+                ["Time", "PBS", "Substation", "Feeder", "Event", "Status", "Duration (Mins)", "Remarks"]
+            ];
+
+            filteredData.forEach(r => {
+                const p = extractItemProps(r);
+                const mins = (Number(r.DurationSeconds || 0) / 60).toFixed(1);
+                excelRows.push([
+                    formatDisplayDate(r.Timestamp),
+                    p.pbs || "N/A",
+                    p.sub || "N/A",
+                    p.fed || "N/A",
+                    r.Event || "N/A",
+                    r.Status || "N/A",
+                    Number(mins),
+                    r.Remarks || ""
+                ]);
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(excelRows);
+
+            const colWidths = [22, 12, 14, 16, 14, 12, 16, 25];
+            ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+            XLSX.utils.book_append_sheet(wb, ws, "Feeder Statement");
+            XLSX.writeFile(wb, `Feeder_Statement_${startVal}_to_${endVal}.xlsx`); 
+        }
+
+        // --- PDF STATEMENT GENERATOR ---
         function exportToPDF() { 
-            const element = document.getElementById('printableContainer');
+            const filteredData = (DATA || []).filter(r => Number(r.DurationSeconds || 0) >= 300);
+
+            if (filteredData.length === 0) {
+                alert("No log records available to export for selected filter.");
+                return;
+            }
+
+            const pbsFilter = document.getElementById('fPBS').value || "All PBS";
+            const subFilter = document.getElementById('fSUB').value || "All SUBs";
+            const fedFilter = document.getElementById('fFed').value || "All Feeders";
+            const eventFilter = document.getElementById('fEvent').value || "All Events";
+            const startVal = document.getElementById('fStart').value || "N/A";
+            const endVal = document.getElementById('fEnd').value || "N/A";
+
+            const totalOutageMinutes = calculateTotalOffToOnOutageMinutes(filteredData);
+
+            let tableRowsHtml = "";
+            filteredData.forEach(r => {
+                const p = extractItemProps(r);
+                const timeStr = formatDisplayDate(r.Timestamp);
+                const mins = (Number(r.DurationSeconds || 0) / 60).toFixed(1);
+                const isOff = String(r.Event || "").includes("OFF");
+                const badgeClass = isOff ? "pdf-badge-off" : "pdf-badge-on";
+
+                tableRowsHtml += `
+                    <tr>
+                        <td>${timeStr}</td>
+                        <td><strong>${p.pbs || "N/A"}</strong></td>
+                        <td>${p.sub || "N/A"}</td>
+                        <td><strong>${p.fed || "N/A"}</strong></td>
+                        <td><span class="pdf-badge ${badgeClass}">${r.Event || "N/A"}</span></td>
+                        <td>${r.Status || "N/A"}</td>
+                        <td style="font-weight: bold; text-align: right;">${mins} min</td>
+                        <td>${r.Remarks || "-"}</td>
+                    </tr>
+                `;
+            });
+
+            const statementHtml = `
+                <div class="pdf-template">
+                    <div class="pdf-header">
+                        <h1 class="pdf-title"><i class="fa-solid fa-bolt me-2"></i>Feeder Interruption & Operation Statement</h1>
+                        <div class="pdf-subtitle">Palli Bidyut Samity Grid Feeder Operational Monitoring System</div>
+                    </div>
+
+                    <div class="pdf-meta-grid">
+                        <div class="pdf-meta-col">
+                            <div><strong>Statement Period:</strong> ${startVal} to ${endVal}</div>
+                            <div><strong>PBS / Unit:</strong> ${pbsFilter}</div>
+                            <div><strong>Substation:</strong> ${subFilter}</div>
+                        </div>
+                        <div class="pdf-meta-col">
+                            <div><strong>Target Feeder:</strong> ${fedFilter}</div>
+                            <div><strong>Event Filter:</strong> ${eventFilter}</div>
+                            <div><strong>Generated On:</strong> ${new Date().toLocaleString()}</div>
+                        </div>
+                    </div>
+
+                    <div class="pdf-kpi-container">
+                        <div class="pdf-kpi-card">
+                            <div class="pdf-kpi-val">${filteredData.length}</div>
+                            <div class="pdf-kpi-lbl">Total Recorded Events</div>
+                        </div>
+                        <div class="pdf-kpi-card" style="margin-left: 2%;">
+                            <div class="pdf-kpi-val">${totalOutageMinutes.toFixed(1)} min</div>
+                            <div class="pdf-kpi-lbl">Total Outage Duration (OFF → ON Only)</div>
+                        </div>
+                    </div>
+
+                    <table class="pdf-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>PBS</th>
+                                <th>Substation</th>
+                                <th>Feeder ID</th>
+                                <th>Event Type</th>
+                                <th>Status</th>
+                                <th style="text-align: right;">Duration</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHtml}
+                        </tbody>
+                    </table>
+
+                    <div class="pdf-footer">
+                        <div style="display: table-cell; width: 50%;">
+                            Official Grid Performance & Maintenance Record Log
+                        </div>
+                        <div style="display: table-cell; width: 50%; text-align: right;">
+                            Page 1 of 1
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const wrapper = document.getElementById('pdfExportWrapper');
+            wrapper.innerHTML = statementHtml;
+            wrapper.style.display = 'block';
+
             const opt = {
-                margin:       [10, 10, 10, 10],
-                filename:     `Feeder_History_Log_${new Date().toISOString().slice(0,10)}.pdf`,
+                margin:       [8, 8, 8, 8],
+                filename:     `Feeder_Statement_${startVal}_to_${endVal}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
-            html2pdf().set(opt).from(element).save(); 
+
+            html2pdf().set(opt).from(wrapper).save().then(() => {
+                wrapper.style.display = 'none';
+                wrapper.innerHTML = '';
+            });
         }
 
         // Initialize dashboard
