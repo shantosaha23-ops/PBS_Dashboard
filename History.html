@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,7 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    
+        
     <!-- SheetJS & html2pdf -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" async></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" async></script>
@@ -173,14 +174,19 @@
                 <div class="col-6 col-md-1">
                     <input type="date" id="fEnd" class="form-control form-control-sm" title="End Date">
                 </div>
-                
+                                
                 <div class="col-12 col-md-2 row g-1">
-                    <div class="col-3">
+                    <div class="col-2">
                         <button class="btn btn-primary btn-sm w-100 fw-semibold" onclick="fetchFilteredLogs()" title="Apply Filter">
                             <i class="fa-solid fa-filter"></i>
                         </button>
                     </div>
-                    <div class="col-3">
+                    <div class="col-2">
+                        <button class="btn btn-secondary btn-sm w-100 fw-semibold" onclick="resetFilters()" title="Reset Filters">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+                    <div class="col-2">
                         <button class="btn btn-outline-primary btn-sm w-100 fw-semibold" onclick="toggleView()" title="Toggle View">
                             <i class="fa-solid fa-list-check"></i>
                         </button>
@@ -222,7 +228,7 @@
                     </tr>
                 </tbody>
             </table>
-            
+                        
             <div id="cardView"></div>
         </div>
     </div>
@@ -232,7 +238,7 @@
         const LOG_BASE_URL = `${EXEC_URL}?mode=history_log`;
 
         let DATA = [];
-        let ALL_LOG_RECORDS = []; // Store full fetched set for dropdown reference
+        let REGISTERED_FEEDERS = []; 
         let isTableView = true;
 
         function setTodayDefaultDates() {
@@ -243,7 +249,80 @@
 
         async function init() {
             setTodayDefaultDates();
+            
+            // 1. Restore cached feeder list from localStorage
+            const cached = localStorage.getItem('FEEDER_MASTER_CACHE');
+            if (cached) {
+                try { 
+                    REGISTERED_FEEDERS = JSON.parse(cached); 
+                    updateCascadingDropdowns();
+                } catch(e){}
+            }
+
+            // 2. Fetch all historical feeder IDs
+            await syncMasterFeederList();
+
+            // 3. Render dropdowns with full feeder list
+            updateCascadingDropdowns();
+
+            // 4. Fetch logs for today's date
             await fetchFilteredLogs();
+        }
+
+        // Reset all filter fields back to initial default position
+        async function resetFilters() {
+            document.getElementById('fPBS').value = "";
+            document.getElementById('fSUB').value = "";
+            document.getElementById('fFed').value = "";
+            document.getElementById('fEvent').value = "";
+            
+            setTodayDefaultDates();
+            updateCascadingDropdowns();
+            await fetchFilteredLogs();
+        }
+
+        // Pulls logs across full historical time range so GAS returns ALL feeders ever logged
+        async function syncMasterFeederList() {
+            try {
+                const broadQueryUrl = `${LOG_BASE_URL}&start=2020-01-01&end=2099-12-31`;
+                const res = await fetch(broadQueryUrl);
+                const masterList = await res.json();
+                if (Array.isArray(masterList) && masterList.length > 0) {
+                    harvestFeeders(masterList);
+                }
+            } catch (e) {
+                console.warn("Could not sync master feeder list on startup:", e);
+            }
+        }
+
+        function extractItemProps(item) {
+            return {
+                pbs: String(item.PBS_ID || item.pbs || item.PBS || "").trim(),
+                sub: String(item.SUB_ID || item.sub || item.SUB || "").trim(),
+                fed: String(item.FeederID || item.feeder || item.relay || item.DEV_ID || item.dev || "").trim()
+            };
+        }
+
+        function harvestFeeders(itemsArray) {
+            if (!Array.isArray(itemsArray)) return;
+
+            const knownKeys = new Set(REGISTERED_FEEDERS.map(i => `${i.pbs}|${i.sub}|${i.fed}`));
+            let updated = false;
+
+            itemsArray.forEach(rawItem => {
+                const p = extractItemProps(rawItem);
+                const key = `${p.pbs}|${p.sub}|${p.fed}`;
+                if (p.fed && !knownKeys.has(key)) {
+                    knownKeys.add(key);
+                    REGISTERED_FEEDERS.push(p);
+                    updated = true;
+                }
+            });
+
+            if (updated) {
+                localStorage.setItem('FEEDER_MASTER_CACHE', JSON.stringify(REGISTERED_FEEDERS));
+                updateCascadingDropdowns();
+            }
         }
 
         async function fetchFilteredLogs() {
@@ -254,12 +333,10 @@
             const start = document.getElementById('fStart').value;
             const end = document.getElementById('fEnd').value;
 
-            // Show Loading State
-            const loadingHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Fetching records...</td></tr>';
-            document.getElementById('logBody').innerHTML = loadingHTML;
+            // Loading State UI
+            document.getElementById('logBody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Fetching records...</td></tr>';
             document.getElementById('cardView').innerHTML = '<div class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Fetching records...</div>';
 
-            // Build Param Query URL
             let queryUrl = `${LOG_BASE_URL}&start=${start}&end=${end}`;
             if (pbs) queryUrl += `&pbs=${encodeURIComponent(pbs)}`;
             if (sub) queryUrl += `&sub=${encodeURIComponent(sub)}`;
@@ -269,15 +346,9 @@
             try {
                 const res = await fetch(queryUrl);
                 const rawList = await res.json();
-                
                 DATA = Array.isArray(rawList) ? rawList : [];
 
-                // Store master dataset on broad fetch
-                if (!pbs && !sub && !fed) {
-                    ALL_LOG_RECORDS = DATA;
-                } else if (ALL_LOG_RECORDS.length === 0) {
-                    ALL_LOG_RECORDS = DATA;
-                }
+                harvestFeeders(DATA);
 
                 if (DATA.length === 0) {
                     const noDataMsg = '<tr><td colspan="8" class="text-center text-warning fw-bold py-3">No log records found for selected period/filter.</td></tr>';
@@ -286,31 +357,20 @@
                     return;
                 }
 
-                // Build/maintain complete dropdown lists
-                updateCascadingDropdowns();
-
                 render(DATA);
             } catch (e) {
                 console.error("Fetch Error:", e);
-                const errorMsg = '<tr><td colspan="8" class="text-center text-danger fw-bold py-3">Error fetching history log. Please verify Apps Script deployment.</td></tr>';
-                document.getElementById('logBody').innerHTML = errorMsg;
+                document.getElementById('logBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger fw-bold py-3">Error fetching history log. Please verify Apps Script deployment.</td></tr>';
                 document.getElementById('cardView').innerHTML = '<div class="text-center text-danger fw-bold py-3">Error fetching history log.</div>';
             }
         }
 
-        // --- CASCADING DROPDOWN LOGIC ---
+        // --- CASCADING DROPDOWNS ---
         function updateCascadingDropdowns() {
-            const masterList = ALL_LOG_RECORDS.length > 0 ? ALL_LOG_RECORDS : DATA;
-
-            // 1. Populate all available PBS options
             const pbsSet = new Set();
-            masterList.forEach(item => {
-                const pbsVal = item.PBS_ID || item.pbs || item.PBS;
-                if (pbsVal && String(pbsVal).trim() !== "") pbsSet.add(String(pbsVal).trim());
-            });
+            REGISTERED_FEEDERS.forEach(i => { if (i.pbs) pbsSet.add(i.pbs); });
             buildSelectOptions('fPBS', Array.from(pbsSet).sort(), 'All PBS');
 
-            // 2. Update SUB & Feeder dropdowns
             updateSubOptions();
             updateFeederOptions();
         }
@@ -329,15 +389,11 @@
 
         function updateSubOptions() {
             const selectedPbs = document.getElementById('fPBS').value;
-            const masterList = ALL_LOG_RECORDS.length > 0 ? ALL_LOG_RECORDS : DATA;
             const subSet = new Set();
 
-            masterList.forEach(item => {
-                const itemPbs = item.PBS_ID || item.pbs || item.PBS;
-                const itemSub = item.SUB_ID || item.sub || item.SUB;
-
-                if (!selectedPbs || String(itemPbs).trim() === selectedPbs) {
-                    if (itemSub && String(itemSub).trim() !== "") subSet.add(String(itemSub).trim());
+            REGISTERED_FEEDERS.forEach(i => {
+                if (!selectedPbs || i.pbs === selectedPbs) {
+                    if (i.sub) subSet.add(i.sub);
                 }
             });
 
@@ -347,19 +403,14 @@
         function updateFeederOptions() {
             const selectedPbs = document.getElementById('fPBS').value;
             const selectedSub = document.getElementById('fSUB').value;
-            const masterList = ALL_LOG_RECORDS.length > 0 ? ALL_LOG_RECORDS : DATA;
             const fedSet = new Set();
 
-            masterList.forEach(item => {
-                const itemPbs = item.PBS_ID || item.pbs || item.PBS;
-                const itemSub = item.SUB_ID || item.sub || item.SUB;
-                const itemFed = item.FeederID || item.feeder || item.relay || item.DEV_ID || item.dev;
-
-                const matchPbs = !selectedPbs || String(itemPbs).trim() === selectedPbs;
-                const matchSub = !selectedSub || String(itemSub).trim() === selectedSub;
+            REGISTERED_FEEDERS.forEach(i => {
+                const matchPbs = !selectedPbs || i.pbs === selectedPbs;
+                const matchSub = !selectedSub || i.sub === selectedSub;
 
                 if (matchPbs && matchSub) {
-                    if (itemFed && String(itemFed).trim() !== "") fedSet.add(String(itemFed).trim());
+                    if (i.fed) fedSet.add(i.fed);
                 }
             });
 
@@ -381,7 +432,7 @@
             }
         }
 
-        // --- RENDER & VIEW FUNCTIONS ---
+        // --- RENDER & EXPORT FUNCTIONS ---
         function toggleView() {
             isTableView = !isTableView;
             document.getElementById('logTable').style.display = isTableView ? 'table' : 'none';
@@ -396,11 +447,7 @@
         }
 
         function render(data) {
-            // Filter out events shorter than 5 minutes (300 seconds)
-            const filteredData = (data || []).filter(r => {
-                const totalSecs = Number(r.DurationSeconds || 0);
-                return totalSecs >= 300; // >= 5 minutes
-            });
+            const filteredData = (data || []).filter(r => Number(r.DurationSeconds || 0) >= 300);
 
             if (filteredData.length === 0) {
                 const noMinMsg = '<tr><td colspan="8" class="text-center text-warning fw-bold py-3">No log records equal to or exceeding 5 minutes found.</td></tr>';
@@ -414,13 +461,13 @@
                     const timeStr = formatDisplayDate(r.Timestamp);
                     const mins = (Number(r.DurationSeconds || 0) / 60).toFixed(1);
                     const eventClass = String(r.Event || "").includes("OFF") ? "event-off" : "event-on";
-                    const feederVal = r.FeederID || r.feeder || r.relay || r.DEV_ID || r.dev || "N/A";
+                    const p = extractItemProps(r);
 
                     return `<tr>
                         <td>${timeStr}</td>
-                        <td><strong>${r.PBS_ID || r.pbs || "N/A"}</strong></td>
-                        <td>${r.SUB_ID || r.sub || "N/A"}</td>
-                        <td><strong>${feederVal}</strong></td>
+                        <td><strong>${p.pbs || "N/A"}</strong></td>
+                        <td>${p.sub || "N/A"}</td>
+                        <td><strong>${p.fed || "N/A"}</strong></td>
                         <td><span class="badge-event ${eventClass}">${r.Event || "N/A"}</span></td>
                         <td>${r.Status || "N/A"}</td>
                         <td class="fw-bold">${mins} min</td>
@@ -431,11 +478,11 @@
                 document.getElementById("cardView").innerHTML = filteredData.map(r => {
                     const timeStr = formatDisplayDate(r.Timestamp);
                     const mins = (Number(r.DurationSeconds || 0) / 60).toFixed(1);
-                    const feederVal = r.FeederID || r.feeder || r.relay || r.DEV_ID || r.dev || "N/A";
+                    const p = extractItemProps(r);
 
                     return `<div class="card-item">
                         <div><span class="card-label">Time:</span> ${timeStr}</div>
-                        <div><span class="card-label">Location:</span> ${r.PBS_ID || r.pbs || "N/A"} / ${r.SUB_ID || r.sub || "N/A"} / <strong>${feederVal}</strong></div>
+                        <div><span class="card-label">Location:</span> ${p.pbs || "N/A"} / ${p.sub || "N/A"} / <strong>${p.fed || "N/A"}</strong></div>
                         <div><span class="card-label">Event:</span> <strong>${r.Event || "N/A"}</strong> (${r.Status || "N/A"})</div>
                         <div><span class="card-label">Duration:</span> ${mins} min</div>
                         <div><span class="card-label">Remarks:</span> ${r.Remarks || "N/A"}</div>
@@ -459,7 +506,6 @@
                 html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
-
             html2pdf().set(opt).from(element).save(); 
         }
 
