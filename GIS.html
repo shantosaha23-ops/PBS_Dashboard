@@ -679,6 +679,7 @@
 
         let firebaseData = {};
         let feederGeoJsonLayer = null;
+        let landmarkLayer = null;
         let feederKmlData = [];
         let availableFeederNames = new Set();
         
@@ -691,6 +692,67 @@
                 const res = await fetch(FIREBASE_URL);
                 firebaseData = await res.json() || {};
             } catch(e) { console.log("Firebase load error:", e); }
+        }
+
+        // Standardized name cleaning for flexible sub-matching
+        function normSubName(str) {
+            if (!str) return "";
+            return str.toString()
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, "");
+        }
+
+        // Traverses Firebase tree to match substation and extract `power` data
+        function findSubstationPowerData(subName) {
+            if (!subName || !firebaseData) return null;
+            const targetClean = normSubName(subName);
+            if (!targetClean) return null;
+
+            for (const pbsKey in firebaseData) {
+                const pbsObj = firebaseData[pbsKey];
+                if (typeof pbsObj !== 'object' || !pbsObj) continue;
+
+                for (const subKey in pbsObj) {
+                    const cleanSubKey = normSubName(subKey);
+                    if (cleanSubKey && (cleanSubKey === targetClean || cleanSubKey.includes(targetClean) || targetClean.includes(cleanSubKey))) {
+                        const subObj = pbsObj[subKey];
+                        if (typeof subObj !== 'object' || !subObj) continue;
+
+                        if (subObj.power) {
+                            return { parentNode: subObj, power: subObj.power };
+                        }
+
+                        for (const childKey in subObj) {
+                            const childObj = subObj[childKey];
+                            if (childObj && typeof childObj === 'object' && childObj.power) {
+                                return { parentNode: childObj, power: childObj.power };
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (const pbsKey in firebaseData) {
+                const pbsObj = firebaseData[pbsKey];
+                if (typeof pbsObj !== 'object' || !pbsObj) continue;
+
+                for (const subKey in pbsObj) {
+                    const subObj = pbsObj[subKey];
+                    if (typeof subObj !== 'object' || !subObj) continue;
+
+                    for (const devKey in subObj) {
+                        const cleanDev = normSubName(devKey);
+                        if (cleanDev && (cleanDev.includes(targetClean) || targetClean.includes(cleanDev))) {
+                            const devObj = subObj[devKey];
+                            if (devObj && typeof devObj === 'object' && devObj.power) {
+                                return { parentNode: devObj, power: devObj.power };
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
 
         function getFeederIDs(name) {
@@ -782,17 +844,89 @@
             return html + `</div>`;
         }
 
+        // Substation Popup Builder with Multi-Unit Dynamic Power Data Display
         function buildStaticPopup(props, nameStr) {
-            let html = `<div style="font-family:sans-serif;font-size:13px;min-width:220px;">
-                <div style="background:${SUBSTATION_COLOR};color:white;padding:8px;text-align:center;font-weight:bold;border-radius:4px 4px 0 0;">⚡ ${nameStr || "Substation Landmark"}</div>
-                <div style="padding:8px;">`;
-            html += `<table style="font-size:12px;width:100%;">`;
+            const matchedData = findSubstationPowerData(nameStr);
+            
+            let html = `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:12px;min-width:240px;color:#1e293b;">
+                <div style="background:${SUBSTATION_COLOR};color:white;padding:8px 10px;text-align:center;font-weight:bold;border-radius:6px 6px 0 0;font-size:13px;">
+                    ⚡ ${nameStr || "Substation Landmark"}
+                </div>
+                <div style="padding:10px;">`;
+
+            if (matchedData && matchedData.power) {
+                const node = matchedData.parentNode || {};
+                const p = matchedData.power;
+
+                let isOnline = false;
+                if (node.deviceStatus === "ONLINE") {
+                    isOnline = true;
+                } else {
+                    let hb = node.lastHeartbeat || p.t || 0;
+                    if (hb) {
+                        hb = Number(hb);
+                        if (hb < 1e12) hb *= 1000;
+                        isOnline = (Date.now() - hb) <= 120000;
+                    }
+                }
+
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;">
+                    <span style="font-weight:bold;color:#475569;">Live Power Metrics:</span>
+                    <span style="padding:2px 8px;border-radius:12px;color:white;font-weight:bold;font-size:10px;background:${isOnline ? '#22c55e' : '#6b7280'};">
+                        ${isOnline ? 'ONLINE' : 'OFFLINE'}
+                    </span>
+                </div>`;
+
+                html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:10px;font-size:12px;">`;
+                
+                // Detect Single-Unit vs Multi-Unit Telemetry
+                const isMultiUnit = p.V1 !== undefined || p.V2 !== undefined || p.I1 !== undefined || p.P1 !== undefined;
+
+                if (!isMultiUnit) {
+                    // Single Unit Display
+                    if (p.V !== undefined)  html += `<div style="display:flex;justify-content:space-between;margin:3px 0;"><b>Voltage (V):</b> <span><b>${p.V}</b> kV</span></div>`;
+                    if (p.I !== undefined)  html += `<div style="display:flex;justify-content:space-between;margin:3px 0;"><b>Current (I):</b> <span><b>${p.I}</b> A</span></div>`;
+                    if (p.P !== undefined)  html += `<div style="display:flex;justify-content:space-between;margin:3px 0;"><b>Power (P):</b> <span><b>${p.P}</b> MW</span></div>`;
+                    if (p.PF !== undefined) html += `<div style="display:flex;justify-content:space-between;margin:3px 0;"><b>Power Factor (PF):</b> <span><b>${p.PF}</b></span></div>`;
+                    if (p.F !== undefined)  html += `<div style="display:flex;justify-content:space-between;margin:3px 0;"><b>Frequency (F):</b> <span><b>${p.F}</b> Hz</span></div>`;
+                } else {
+                    // Multi-Unit Dynamic Display (Unit 1 & Unit 2)
+                    let units = new Set();
+                    Object.keys(p).forEach(k => {
+                        const m = k.match(/^[A-Za-z]+(\d+)$/);
+                        if (m) units.add(m[1]);
+                    });
+
+                    let unitList = Array.from(units).sort((a,b) => Number(a) - Number(b));
+                    if (unitList.length === 0) unitList = ["1", "2"];
+
+                    unitList.forEach(u => {
+                        html += `<div style="font-weight:bold;color:#2563eb;margin-top:4px;margin-bottom:2px;border-bottom:1px dashed #cbd5e1;padding-bottom:2px;">Unit ${u}:</div>`;
+                        if (p[`V${u}`] !== undefined)  html += `<div style="display:flex;justify-content:space-between;margin:2px 0;padding-left:6px;"><b>Voltage:</b> <span><b>${p[`V${u}`]}</b> kV</span></div>`;
+                        if (p[`I${u}`] !== undefined)  html += `<div style="display:flex;justify-content:space-between;margin:2px 0;padding-left:6px;"><b>Current:</b> <span><b>${p[`I${u}`]}</b> A</span></div>`;
+                        if (p[`P${u}`] !== undefined)  html += `<div style="display:flex;justify-content:space-between;margin:2px 0;padding-left:6px;"><b>Power:</b> <span><b>${p[`P${u}`]}</b> MW</span></div>`;
+                        if (p[`PF${u}`] !== undefined) html += `<div style="display:flex;justify-content:space-between;margin:2px 0;padding-left:6px;"><b>Power Factor:</b> <span><b>${p[`PF${u}`]}</b></span></div>`;
+                        if (p[`F${u}`] !== undefined)  html += `<div style="display:flex;justify-content:space-between;margin:2px 0;padding-left:6px;"><b>Frequency:</b> <span><b>${p[`F${u}`]}</b> Hz</span></div>`;
+                    });
+                }
+
+                html += `</div>`;
+            } else {
+                html += `<div style="background:#f1f5f9;border:1px dashed #cbd5e1;border-radius:6px;padding:6px;margin-bottom:10px;text-align:center;color:#64748b;font-size:11px;">
+                    ⚠️ No Live Power Data Match
+                </div>`;
+            }
+
+            // KML Attributes Metadata Table
+            html += `<div style="font-weight:bold;color:#475569;margin-bottom:4px;">Landmark Details:</div>`;
+            html += `<table style="font-size:11px;width:100%;border-collapse:collapse;">`;
             for (const k in props) {
                 if (k !== "name" && props[k]) {
-                    html += `<tr><td style="font-weight:bold;padding:2px 0;">${k}</td><td>: ${props[k]}</td></tr>`;
+                    html += `<tr style="border-bottom:1px solid #f1f5f9;"><td style="font-weight:600;padding:3px 0;color:#64748b;">${k}</td><td style="text-align:right;padding:3px 0;color:#0f172a;">${props[k]}</td></tr>`;
                 }
             }
-            return html + `</table></div></div>`;
+            html += `</table></div></div>`;
+            return html;
         }
 
         function parseKmlXml(xmlText) {
@@ -872,7 +1006,7 @@
             });
         }
 
-        // Independent Loader for pbs_info.kml
+        // Loader for pbs_info.kml connected with matched Firebase Power Data
         async function loadStaticLandmarks() {
             try {
                 const res = await fetch(KML_LANDMARKS_URL);
@@ -880,14 +1014,23 @@
                 const xmlText = await res.text();
                 const features = parseKmlXml(xmlText);
 
-                const landmarkLayer = L.geoJSON(features, {
+                landmarkLayer = L.geoJSON(features, {
                     pointToLayer: (f, latlng) => {
                         return L.marker(latlng, { icon: createSubstationIcon(f.properties) });
                     },
-                    style: {
-                        color: SUBSTATION_COLOR,
-                        weight: 4,
-                        opacity: 0.85
+                    style: f => {
+                        const rawStatus = (f.properties.status || f.properties.Status || f.properties.STATUS || "existing").toString().toLowerCase();
+                        let borderCol = "#dc2626"; // Existing -> Red
+                        if (rawStatus.includes("proposed")) {
+                            borderCol = "#2563eb"; // Proposed -> Blue
+                        } else if (rawStatus.includes("construction") || rawStatus.includes("under")) {
+                            borderCol = "#f59e0b"; // Under Construction -> Amber
+                        }
+                        return {
+                            color: borderCol,
+                            weight: 3,
+                            opacity: 0.85
+                        };
                     },
                     onEachFeature: (f, l) => {
                         const nameStr = f.properties.name || "Substation Landmark";
@@ -899,6 +1042,17 @@
             } catch (err) {
                 console.error("Failed to load static landmarks:", err);
             }
+        }
+
+        // Realtime Refresh for Substation Landmarks
+        function updateLandmarkLayer() {
+            if (!landmarkLayer) return;
+            landmarkLayer.eachLayer(l => {
+                const f = l.feature;
+                if (!f) return;
+                const nameStr = f.properties.name || "Substation Landmark";
+                l.setPopupContent(buildStaticPopup(f.properties, nameStr));
+            });
         }
 
         // Reset previous Feeder Group highlight
@@ -1127,14 +1281,14 @@
         }
 
         async function init() {
-            loadStaticLandmarks();
-
             await loadFirebase();
+            await loadStaticLandmarks();
             await loadDynamicFeeders();
 
             setInterval(async () => { 
                 await loadFirebase(); 
                 updateDynamicLayer(); 
+                updateLandmarkLayer();
             }, 30000);
         }
 
