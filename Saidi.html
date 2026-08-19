@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -311,7 +310,6 @@
                 const response = await fetch(MASTER_URL);
                 const data = await response.json();
                 
-                // Parse payload whether it is raw array or wrapped in object key
                 let rawList = [];
                 if (Array.isArray(data)) {
                     rawList = data;
@@ -343,8 +341,16 @@
                 monthSelect.innerHTML = '<option value="all">All Months</option>';
 
                 pbsSet.forEach(p => pbsSelect.innerHTML += `<option value="${p}">${p}</option>`);
-                monthSet.forEach(m => monthSelect.innerHTML += `<option value="${m}">${m}</option>`);
+
+                // Sort months descending so the most recent month is at index 0
+                const sortedMonths = Array.from(monthSet).sort().reverse();
+                sortedMonths.forEach(m => monthSelect.innerHTML += `<option value="${m}">${m}</option>`);
                 
+                // Automatically set default filter to the latest month
+                if (sortedMonths.length > 0) {
+                    monthSelect.value = sortedMonths[0];
+                }
+
                 updateSubFilter();
             } catch (e) { 
                 console.error("Fetch Error:", e);
