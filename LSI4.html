@@ -1,10 +1,18 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Load Supply Entry - Naogaon PBS-1</title>
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- jsPDF and AutoTable for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
     <style>
         body { font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; padding-top: 220px; }
         .sticky-wrapper {
@@ -27,7 +35,7 @@
             color: #000;
             font-style: normal;
         }
-        input[type="date"], select { 
+        input[type="date"], input[type="month"], select { 
             font-size: 14px; padding: 5px; border: 1px solid #ccc; border-radius: 4px;
         }
         .table-header-row {
@@ -39,6 +47,7 @@
         .grid-normal { grid-template-columns: 1.2fr 1.5fr 1.5fr 1.5fr 1.2fr; }
         .grid-gridmode { grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr; }
         .grid-summarymode { grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr; }
+        .grid-maxdemandmode { grid-template-columns: 1.5fr 1.2fr 1fr 1.2fr 1.2fr 1fr 1fr; }
         
         table { width: 100%; border-collapse: collapse; background: white; }
         td { border: 1px solid #ddd; padding: 8px; text-align: center; }
@@ -55,9 +64,14 @@
         #refresh { background: #4CAF50; padding: 6px 15px; }
         #toggleView { background: #f39c12; padding: 6px 15px; }
         
+        /* Export Buttons Styling */
+        #btnExcel { background: #1D6F42; padding: 6px 15px; display: none; }
+        #btnPdf { background: #E74C3C; padding: 6px 15px; display: none; }
+        
         .subtotal-row { background-color: #f9fbfd; font-weight: bold; color: #333; }
         .total-row { background-color: #eef7ff; font-weight: bold; color: #000; }
-        
+        .max-highlight { background-color: #e8f5e9; font-weight: bold; color: #2e7d32; }
+
         #chartContainer {
             display: none; width: 95%; max-width: 800px; margin: 20px auto;
             background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -76,7 +90,8 @@
     <h2>Naogaon PBS-1</h2>
     <h2>Daily Load Supply Information</h2>
     <div class="controls">
-        <span>Date: <input type="date" id="date"></span>
+        <span id="dateContainer">Date: <input type="date" id="date"></span>
+        <span id="monthContainer" style="display: none;">Month: <input type="month" id="monthFilter"></span>
         
         <span id="hourFilterContainer" style="display: none;">Hour: 
             <select id="selectedHour"></select>
@@ -109,12 +124,16 @@
                 <option value="Niamatpur Grid">Niamatpur Grid (Sum 11-16)</option>
                 <option value="Total PBS-1 Grid">Total Naogaon PBS-1 Grid (Sum 1-16)</option>
             </optgroup>
-            <optgroup label="Summary View">
+            <optgroup label="Summary Views">
                 <option value="Hourly All Summary">Hourly All Substation Summary</option>
+                <option value="Monthly Max Demand">Monthly Max Demand View</option>
             </optgroup>
         </select></span>
         <button id="refresh" onclick="loadData()">Refresh</button>
         <button id="toggleView" onclick="toggleView()">Show Graph</button>
+        <!-- Download Buttons -->
+        <button id="btnExcel" onclick="exportToExcel()">Excel</button>
+        <button id="btnPdf" onclick="exportToPDF()">PDF</button>
     </div>
     <div id="dynamicHeader" class="table-header-row grid-normal"></div>
 </div>
@@ -143,6 +162,10 @@ const niamatpurGroup = ["MAN1(Mandra)","MAN2(Deluabari)","MAN3(Sotihat)","NIA1(N
         opt.innerText = displayHour(i);
         hrSelect.appendChild(opt);
     }
+    
+    const now = new Date();
+    const mStr = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, '0');
+    document.getElementById("monthFilter").value = mStr;
 })();
 
 function toggleView() {
@@ -164,7 +187,8 @@ function toggleView() {
 }
 
 function updateChart() {
-    if(document.getElementById("ss").value === "Hourly All Summary") return;
+    const ssVal = document.getElementById("ss").value;
+    if(ssVal === "Hourly All Summary" || ssVal === "Monthly Max Demand") return;
 
     const labels = [];
     const demandData = [];
@@ -255,6 +279,13 @@ function createTable(isGrid) {
         return;
     }
 
+    if(ssVal === "Monthly Max Demand") {
+        head.className = "table-header-row grid-maxdemandmode";
+        head.innerHTML = "<div>Substation / Unit</div><div>Max Demand Date</div><div>Time</div><div>Max Demand</div><div>Supply</div><div>LS</div><div>%LS</div>";
+        body.innerHTML = "";
+        return;
+    }
+
     if(isGrid) {
         head.className = "table-header-row grid-gridmode";
         head.innerHTML = "<div>Hour</div><div>Demand</div><div>Supply</div><div>LS</div><div>%LS</div><div>Remark</div><div>Action</div>";
@@ -285,10 +316,37 @@ async function loadData() {
 
     var ss = document.getElementById("ss").value;
     var dateInput = document.getElementById("date").value;
+    var monthInput = document.getElementById("monthFilter").value;
+    
+    var dateCont = document.getElementById("dateContainer");
+    var monthCont = document.getElementById("monthContainer");
     var hrContainer = document.getElementById("hourFilterContainer");
     var toggleViewBtn = document.getElementById("toggleView");
+    var btnExcel = document.getElementById("btnExcel");
+    var btnPdf = document.getElementById("btnPdf");
 
-    if (!dateInput) return;
+    if (ss === "Monthly Max Demand") {
+        dateCont.style.display = "none";
+        monthCont.style.display = "inline";
+        hrContainer.style.display = "none";
+        toggleViewBtn.style.display = "none";
+        
+        // Show download buttons ONLY on Monthly Max Demand page
+        btnExcel.style.display = "inline";
+        btnPdf.style.display = "inline";
+
+        if (isGraphView) toggleView();
+
+        createTable(false);
+        if (monthInput) await loadMonthlyMaxDemandData(monthInput, requestId);
+        return;
+    } else {
+        dateCont.style.display = "inline";
+        monthCont.style.display = "none";
+        // Hide download buttons on all other views
+        btnExcel.style.display = "none";
+        btnPdf.style.display = "none";
+    }
 
     if (ss === "Hourly All Summary") {
         hrContainer.style.display = "inline";
@@ -313,6 +371,236 @@ async function loadData() {
 
         if (isGraphView) updateChart();
     }
+}
+
+async function loadMonthlyMaxDemandData(monthStr, requestId) {
+    globalLock("Scanning Month...");
+    var body = document.getElementById("tableBody");
+    body.innerHTML = "";
+
+    const [yearStr, mNumStr] = monthStr.split("-");
+    const year = parseInt(yearStr);
+    const month = parseInt(mNumStr);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    const allSubstations = [...naogaonGroup, ...niamatpurGroup];
+
+    const datePromises = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dStr = yearStr + "-" + mNumStr + "-" + String(day).padStart(2, '0');
+        datePromises.push(
+            Promise.all(allSubstations.map(subName =>
+                fetch(scriptURL + "?action=get&ss=" + encodeURIComponent(subName) + "&date=" + dStr)
+                .then(r => r.json())
+                .catch(() => [])
+            )).then(subResults => ({ date: dStr, subResults }))
+        );
+    }
+
+    const monthData = await Promise.all(datePromises);
+    if (requestId !== currentRequestId) return;
+
+    let subMaxRecords = {};
+    allSubstations.forEach(s => subMaxRecords[s] = { maxD: -1, supply: 0, date: "-", hour: "-" });
+
+    let gridTotalsByDateHour = {};
+
+    monthData.forEach(dayEntry => {
+        const dStr = dayEntry.date;
+        dayEntry.subResults.forEach((subData, subIdx) => {
+            const subName = allSubstations[subIdx];
+            subData.forEach(row => {
+                const h = parseInt(row.hour);
+                const d = parseFloat(row.demand || 0);
+                const s = parseFloat(row.supply || 0);
+
+                if (d > subMaxRecords[subName].maxD) {
+                    subMaxRecords[subName] = { maxD: d, supply: s, date: dStr, hour: h };
+                }
+
+                const key = dStr + "_" + h;
+                if (!gridTotalsByDateHour[key]) {
+                    gridTotalsByDateHour[key] = { naoD: 0, naoS: 0, niaD: 0, niaS: 0 };
+                }
+
+                if (naogaonGroup.includes(subName)) {
+                    gridTotalsByDateHour[key].naoD += d;
+                    gridTotalsByDateHour[key].naoS += s;
+                } else if (niamatpurGroup.includes(subName)) {
+                    gridTotalsByDateHour[key].niaD += d;
+                    gridTotalsByDateHour[key].niaS += s;
+                }
+            });
+        });
+    });
+
+    allSubstations.forEach(subName => {
+        const rec = subMaxRecords[subName];
+        let ls = Math.max(0, rec.maxD - rec.supply);
+        let pls = rec.maxD > 0 ? (ls / rec.maxD * 100) : 0;
+
+        let row = document.createElement("tr");
+        row.className = "grid-maxdemandmode";
+        row.style.display = "grid";
+        row.innerHTML = `
+            <td>${subName}</td>
+            <td>${rec.date}</td>
+            <td>${rec.hour !== "-" ? displayHour(rec.hour) : "-"}</td>
+            <td>${rec.maxD > -1 ? rec.maxD.toFixed(2) : "-"}</td>
+            <td>${rec.maxD > -1 ? rec.supply.toFixed(2) : "-"}</td>
+            <td>${rec.maxD > -1 ? ls.toFixed(2) : "-"}</td>
+            <td>${rec.maxD > 0 ? pls.toFixed(1) + "%" : "-"}</td>
+        `;
+        body.appendChild(row);
+    });
+
+    let maxNaogaon = { maxD: -1, supply: 0, date: "-", hour: "-" };
+    let maxNiamatpur = { maxD: -1, supply: 0, date: "-", hour: "-" };
+    let maxTotal = { maxD: -1, supply: 0, date: "-", hour: "-" };
+
+    Object.keys(gridTotalsByDateHour).forEach(key => {
+        const [dStr, hStr] = key.split("_");
+        const h = parseInt(hStr);
+        const data = gridTotalsByDateHour[key];
+
+        if (data.naoD > maxNaogaon.maxD) {
+            maxNaogaon = { maxD: data.naoD, supply: data.naoS, date: dStr, hour: h };
+        }
+        if (data.niaD > maxNiamatpur.maxD) {
+            maxNiamatpur = { maxD: data.niaD, supply: data.niaS, date: dStr, hour: h };
+        }
+        const totalD = data.naoD + data.niaD;
+        const totalS = data.naoS + data.niaS;
+        if (totalD > maxTotal.maxD) {
+            maxTotal = { maxD: totalD, supply: totalS, date: dStr, hour: h };
+        }
+    });
+
+    let naoLs = Math.max(0, maxNaogaon.maxD - maxNaogaon.supply);
+    let naoPls = maxNaogaon.maxD > 0 ? (naoLs / maxNaogaon.maxD * 100) : 0;
+    let naoRow = document.createElement("tr");
+    naoRow.className = "grid-maxdemandmode subtotal-row max-highlight";
+    naoRow.style.display = "grid";
+    naoRow.innerHTML = `
+        <td>Naogaon Grid Max Peak</td>
+        <td>${maxNaogaon.date}</td>
+        <td>${maxNaogaon.hour !== "-" ? displayHour(maxNaogaon.hour) : "-"}</td>
+        <td>${maxNaogaon.maxD.toFixed(2)}</td>
+        <td>${maxNaogaon.supply.toFixed(2)}</td>
+        <td>${naoLs.toFixed(2)}</td>
+        <td>${maxNaogaon.maxD > 0 ? naoPls.toFixed(1) + "%" : "0.0%"}</td>
+    `;
+    body.appendChild(naoRow);
+
+    let niaLs = Math.max(0, maxNiamatpur.maxD - maxNiamatpur.supply);
+    let niaPls = maxNiamatpur.maxD > 0 ? (niaLs / maxNiamatpur.maxD * 100) : 0;
+    let niaRow = document.createElement("tr");
+    niaRow.className = "grid-maxdemandmode subtotal-row max-highlight";
+    niaRow.style.display = "grid";
+    niaRow.innerHTML = `
+        <td>Niamatpur Grid Max Peak</td>
+        <td>${maxNiamatpur.date}</td>
+        <td>${maxNiamatpur.hour !== "-" ? displayHour(maxNiamatpur.hour) : "-"}</td>
+        <td>${maxNiamatpur.maxD.toFixed(2)}</td>
+        <td>${maxNiamatpur.supply.toFixed(2)}</td>
+        <td>${niaLs.toFixed(2)}</td>
+        <td>${maxNiamatpur.maxD > 0 ? niaPls.toFixed(1) + "%" : "0.0%"}</td>
+    `;
+    body.appendChild(niaRow);
+
+    let totLs = Math.max(0, maxTotal.maxD - maxTotal.supply);
+    let totPls = maxTotal.maxD > 0 ? (totLs / maxTotal.maxD * 100) : 0;
+    let totRow = document.createElement("tr");
+    totRow.className = "grid-maxdemandmode total-row max-highlight";
+    totRow.style.display = "grid";
+    totRow.innerHTML = `
+        <td>TOTAL PBS-1 MAX PEAK</td>
+        <td>${maxTotal.date}</td>
+        <td>${maxTotal.hour !== "-" ? displayHour(maxTotal.hour) : "-"}</td>
+        <td>${maxTotal.maxD.toFixed(2)}</td>
+        <td>${maxTotal.supply.toFixed(2)}</td>
+        <td>${totLs.toFixed(2)}</td>
+        <td>${maxTotal.maxD > 0 ? totPls.toFixed(1) + "%" : "0.0%"}</td>
+    `;
+    body.appendChild(totRow);
+
+    var buttons = document.getElementsByTagName("button"), selects = document.getElementsByTagName("select");
+    for (var j = 0; j < buttons.length; j++) if(buttons[j].id === "refresh") { buttons[j].disabled = false; buttons[j].innerText = "Refresh"; }
+    for (var k = 0; k < selects.length; k++) selects[k].disabled = false;
+    document.getElementById("monthFilter").disabled = false;
+}
+
+// Function to extract parsed data array from table
+function getMonthlyMaxTableData() {
+    const headers = ["Substation / Unit", "Max Demand Date", "Time", "Max Demand (MW)", "Supply (MW)", "LS (MW)", "%LS"];
+    const rows = [];
+    const tableBodyRows = document.querySelectorAll("#tableBody tr");
+
+    tableBodyRows.forEach(tr => {
+        const cells = tr.querySelectorAll("td");
+        if (cells.length === 7) {
+            rows.push([
+                cells[0].innerText.trim(),
+                cells[1].innerText.trim(),
+                cells[2].innerText.trim(),
+                cells[3].innerText.trim(),
+                cells[4].innerText.trim(),
+                cells[5].innerText.trim(),
+                cells[6].innerText.trim()
+            ]);
+        }
+    });
+    return { headers, rows };
+}
+
+// Excel Export Handler
+function exportToExcel() {
+    const month = document.getElementById("monthFilter").value;
+    const { headers, rows } = getMonthlyMaxTableData();
+    
+    if (rows.length === 0) {
+        alert("No data available to export.");
+        return;
+    }
+
+    const worksheetData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Monthly Max Demand");
+
+    XLSX.writeFile(wb, `Monthly_Max_Demand_${month}.xlsx`);
+}
+
+// PDF Export Handler
+function exportToPDF() {
+    const month = document.getElementById("monthFilter").value;
+    const { headers, rows } = getMonthlyMaxTableData();
+
+    if (rows.length === 0) {
+        alert("No data available to export.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    doc.setFontSize(16);
+    doc.text("Naogaon PBS-1", 105, 12, { align: "center" });
+    doc.setFontSize(12);
+    doc.text(`Monthly Max Demand Report (${month})`, 105, 18, { align: "center" });
+
+    doc.autoTable({
+        head: [headers],
+        body: rows,
+        startY: 24,
+        theme: 'grid',
+        headStyles: { fillColor: [45, 156, 255], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        bodyStyles: { fontSize: 8, halign: 'center' },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { top: 20, left: 10, right: 10 }
+    });
+
+    doc.save(`Monthly_Max_Demand_${month}.pdf`);
 }
 
 async function loadHourlySummaryData(date, requestId) {
@@ -366,7 +654,6 @@ async function loadHourlySummaryData(date, requestId) {
         body.appendChild(row);
     });
 
-    // 1. Calculate and append Naogaon Grid Subtotal
     let naoLs = Math.max(0, naogaonDemand - naogaonSupply);
     let naoPls = naogaonDemand > 0 ? (naoLs / naogaonDemand * 100) : 0;
     let naoRow = document.createElement("tr");
@@ -381,7 +668,6 @@ async function loadHourlySummaryData(date, requestId) {
     `;
     body.appendChild(naoRow);
 
-    // 2. Calculate and append Niamatpur Grid Subtotal
     let niaLs = Math.max(0, niamatpurDemand - niamatpurSupply);
     let niaPls = niamatpurDemand > 0 ? (niaLs / niamatpurDemand * 100) : 0;
     let niaRow = document.createElement("tr");
@@ -396,7 +682,6 @@ async function loadHourlySummaryData(date, requestId) {
     `;
     body.appendChild(niaRow);
 
-    // 3. Calculate and append Combined Total Row
     let totalDemand = naogaonDemand + niamatpurDemand;
     let totalSupply = naogaonSupply + niamatpurSupply;
     let totalLs = Math.max(0, totalDemand - totalSupply);
@@ -537,8 +822,8 @@ function deleteHour(h) {
 
 function globalLock(msg) {
     var inputs = document.getElementsByTagName("input"), buttons = document.getElementsByTagName("button"), selects = document.getElementsByTagName("select");
-    for (var i = 0; i < inputs.length; i++) if(inputs[i].id !== "date") inputs[i].disabled = true;
-    for (var j = 0; j < buttons.length; j++) if(buttons[j].id !== "refresh" && buttons[j].id !== "toggleView") { buttons[j].disabled = true; buttons[j].innerText = msg; }
+    for (var i = 0; i < inputs.length; i++) if(inputs[i].id !== "date" && inputs[i].id !== "monthFilter") inputs[i].disabled = true;
+    for (var j = 0; j < buttons.length; j++) if(buttons[j].id !== "refresh" && buttons[j].id !== "toggleView" && buttons[j].id !== "btnExcel" && buttons[j].id !== "btnPdf") { buttons[j].disabled = true; buttons[j].innerText = msg; }
     for (var k = 0; k < selects.length; k++) {
         if(selects[k].id === "ss" || selects[k].id === "selectedHour") {
             selects[k].disabled = false;
@@ -563,6 +848,7 @@ function saveHour(h) {
 
 document.getElementById("ss").addEventListener("change", loadData);
 document.getElementById("date").addEventListener("change", loadData);
+document.getElementById("monthFilter").addEventListener("change", loadData);
 document.getElementById("selectedHour").addEventListener("change", loadData);
 document.getElementById("date").value = getLocalDateString(new Date());
 loadData();
