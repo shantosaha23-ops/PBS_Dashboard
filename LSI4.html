@@ -367,40 +367,48 @@ async function loadHourlySummaryData(date, requestId) {
         body.appendChild(row);
     });
 
-    // 1. Calculate and append Naogaon Grid Subtotal
+    // 1. Calculate Naogaon Grid Subtotals (Rounded)
     let naoLs = Math.max(0, naogaonDemand - naogaonSupply);
     let naoPls = naogaonDemand > 0 ? (naoLs / naogaonDemand * 100) : 0;
+    let naoDemandRounded = Math.round(naogaonDemand);
+    let naoSupplyRounded = Math.round(naogaonSupply);
+    let naoLsRounded = Math.round(naoLs);
+
     let naoRow = document.createElement("tr");
     naoRow.className = "grid-summarymode subtotal-row";
     naoRow.style.display = "grid";
     naoRow.innerHTML = `
         <td>Naogaon Grid Sum (1-10)</td>
-        <td>${naogaonDemand.toFixed(2)}</td>
-        <td>${naogaonSupply.toFixed(2)}</td>
-        <td>${naoLs.toFixed(2)}</td>
+        <td>${naoDemandRounded}</td>
+        <td>${naoSupplyRounded}</td>
+        <td>${naoLsRounded}</td>
         <td>${naogaonDemand > 0 ? naoPls.toFixed(1) + "%" : "0.0%"}</td>
     `;
     body.appendChild(naoRow);
 
-    // 2. Calculate and append Niamatpur Grid Subtotal
+    // 2. Calculate Niamatpur Grid Subtotals (Rounded)
     let niaLs = Math.max(0, niamatpurDemand - niamatpurSupply);
     let niaPls = niamatpurDemand > 0 ? (niaLs / niamatpurDemand * 100) : 0;
+    let niaDemandRounded = Math.round(niamatpurDemand);
+    let niaSupplyRounded = Math.round(niamatpurSupply);
+    let niaLsRounded = Math.round(niaLs);
+
     let niaRow = document.createElement("tr");
     niaRow.className = "grid-summarymode subtotal-row";
     niaRow.style.display = "grid";
     niaRow.innerHTML = `
         <td>Niamatpur Grid Sum (11-16)</td>
-        <td>${niamatpurDemand.toFixed(2)}</td>
-        <td>${niamatpurSupply.toFixed(2)}</td>
-        <td>${niaLs.toFixed(2)}</td>
+        <td>${niaDemandRounded}</td>
+        <td>${niaSupplyRounded}</td>
+        <td>${niaLsRounded}</td>
         <td>${niamatpurDemand > 0 ? niaPls.toFixed(1) + "%" : "0.0%"}</td>
     `;
     body.appendChild(niaRow);
 
-    // 3. Calculate and append Combined Total Row
-    let totalDemand = naogaonDemand + niamatpurDemand;
-    let totalSupply = naogaonSupply + niamatpurSupply;
-    let totalLs = Math.max(0, totalDemand - totalSupply);
+    // 3. Combined Total Row = Direct sum of the rounded grid values
+    let totalDemand = naoDemandRounded + niaDemandRounded;
+    let totalSupply = naoSupplyRounded + niaSupplyRounded;
+    let totalLs = naoLsRounded + niaLsRounded;
     let totalPls = totalDemand > 0 ? (totalLs / totalDemand * 100) : 0;
 
     let totalRow = document.createElement("tr");
@@ -408,9 +416,9 @@ async function loadHourlySummaryData(date, requestId) {
     totalRow.style.display = "grid";
     totalRow.innerHTML = `
         <td>TOTAL (SUM)</td>
-        <td>${totalDemand.toFixed(2)}</td>
-        <td>${totalSupply.toFixed(2)}</td>
-        <td>${totalLs.toFixed(2)}</td>
+        <td>${totalDemand}</td>
+        <td>${totalSupply}</td>
+        <td>${totalLs}</td>
         <td>${totalDemand > 0 ? totalPls.toFixed(1) + "%" : "0.0%"}</td>
     `;
     body.appendChild(totalRow);
@@ -492,12 +500,12 @@ async function loadGridData(gridName, date, requestId) {
 
             lockRow(
                 h,
-                d.toFixed(2),
-                s.toFixed(2),
+                Math.round(d),
+                Math.round(s),
                 "Total",
                 "Grid",
                 true,
-                ls.toFixed(2),
+                Math.round(ls),
                 pls.toFixed(1)
             );
         }
