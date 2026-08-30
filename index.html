@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,7 +29,7 @@
         html, body { touch-action: pan-x pan-y pinch-zoom; }
         .hidden { display: none !important; }
 
-        /* HEADER */
+        /* HEADER BAR */
         .app-header { 
             background: #ffffff; 
             padding: 0 16px; 
@@ -39,13 +40,14 @@
             height: 60px;
             box-sizing: border-box;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            position: sticky; 
+            position: fixed; 
             top: 0; 
-            z-index: 100;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
         }
         
         .header-left { display: flex; align-items: center; gap: 10px; }
-        .header-center { display: flex; align-items: center; justify-content: center; flex: 1; margin: 0 10px; }
         .header-right { display: flex; align-items: center; gap: 8px; }
 
         .icon-btn { 
@@ -73,39 +75,39 @@
             border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
-            white-space: nowrap;
         }
 
-        .pc-back-btn {
-            background: #eff6ff;
-            color: var(--primary-light);
-            border: 1px solid #dbeafe;
-            padding: 5px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            display: none;
+        .header-title { font-size: 15px; font-weight: 700; color: #1e293b; }
+
+        /* SUB-PAGE TOOLBAR */
+        #sub-page-toolbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 54px;
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
             align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            white-space: nowrap;
+            justify-content: space-between;
+            padding: 0 12px;
+            box-sizing: border-box;
+            z-index: 1100;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
-        .header-title { font-size: 15px; font-weight: 700; color: #1e293b; text-align: center; }
-
-        /* DYNAMIC NAV SELECTOR */
-        .page-nav-select {
+        .page-select-dropdown {
             padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
             font-size: 13px;
             font-weight: 600;
-            color: var(--primary-light);
-            background: #eff6ff;
-            border: 1px solid #dbeafe;
-            border-radius: 8px;
+            color: #1e293b;
+            background-color: #f8fafc;
             outline: none;
             cursor: pointer;
-            max-width: 220px;
-            width: 100%;
+            max-width: 60%;
         }
 
         /* SIDEBAR */
@@ -212,6 +214,10 @@
             margin-top: 6px;
         }
 
+        #main-app {
+            padding-top: 60px;
+        }
+
         .grid { 
             display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; 
             padding: 20px 16px; max-width: 600px; margin: 0 auto; box-sizing: border-box;
@@ -235,6 +241,24 @@
         .card-purple .icon-wrapper { background: #faf5ff; color: #9333ea; }
         .card-rose .icon-wrapper { background: #fff1f2; color: #e11d48; }
         .card-cyan .icon-wrapper { background: #ecfeff; color: #0891b2; }
+
+        /* FULLSCREEN SUB-PAGE IFRAME CONTAINER */
+        #iframe-wrapper {
+            position: fixed;
+            top: 54px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 54px);
+            z-index: 1050;
+            background: white;
+        }
+
+        #sub-page-container { 
+            width: 100%; 
+            height: 100%; 
+            border: none; 
+            background: white; 
+        }
 
         /* AUTH MODAL & INPUT FIELDS */
         .auth-modal {
@@ -288,11 +312,6 @@
 
         .timer-badge {
             font-size: 12px; color: #e11d48; font-weight: 600; margin-top: 4px; display: block;
-        }
-
-        #sub-page-container { 
-            width: 100%; height: calc(100vh - 60px); border: none; 
-            background: white; position: fixed; top: 60px; left: 0; z-index: 99; 
         }
     </style>
 </head>
@@ -395,37 +414,40 @@
         </button>
     </div>
 
-    <!-- MAIN APP INTERFACE -->
-    <div id="main-app">
-        <div class="app-header">
-            <div class="header-left">
-                <button class="icon-btn" onclick="toggleMenu()"><i data-lucide="menu"></i></button>
-                <button id="pc-back-btn" class="pc-back-btn" onclick="backToHome()">
-                    <i data-lucide="arrow-left" size="14"></i> Back
-                </button>
-            </div>
-            
-            <div class="header-center">
-                <span id="header-main-title" class="header-title">All PBS Substation Monitor</span>
-                <!-- DYNAMIC NAVIGATION DROPDOWN -->
-                <select id="header-nav-dropdown" class="page-nav-select hidden" onchange="openSubPage(this.value)">
-                    <option value="ALL_PBS.html">All Substation Monitor</option>
-                    <option value="LSI4.html">Daily LSI Report</option>
-                    <option value="Saidi.html">SAIDI / SAIFI</option>
-                    <option value="GIS.html">GIS View</option>
-                    <option value="History.html">History Log</option>
-                    <option value="SCADA.html">SCADA Operation</option>
-                </select>
-            </div>
-
-            <div class="header-right">
-                <div id="header-user-badge" class="user-profile-badge">
-                    <i data-lucide="user" size="14"></i>
-                    <span id="badge-username">User</span>
-                </div>
+    <!-- MAIN HEADER BAR -->
+    <div id="main-header-bar" class="app-header">
+        <div class="header-left">
+            <button class="icon-btn" onclick="toggleMenu()"><i data-lucide="menu"></i></button>
+        </div>
+        <span class="header-title">All PBS Substation Monitor</span>
+        <div class="header-right">
+            <div id="header-user-badge" class="user-profile-badge">
+                <i data-lucide="user" size="14"></i>
+                <span id="badge-username">User</span>
             </div>
         </div>
+    </div>
 
+    <!-- SUB-PAGE TOOLBAR (BACK BUTTON & DROPDOWN) -->
+    <div id="sub-page-toolbar" class="hidden">
+        <button class="icon-btn" onclick="backToHome()" title="Back to Home">
+            <i data-lucide="arrow-left" size="22"></i>
+        </button>
+        <select id="sub-page-select" class="page-select-dropdown" onchange="switchSubPageFromDropdown(this.value)">
+            <option value="ALL_PBS.html">All Substation Monitor</option>
+            <option value="LSI4.html">Daily LSI Report</option>
+            <option value="Saidi.html">SAIDI / SAIFI</option>
+            <option value="GIS.html">GIS View</option>
+            <option value="History.html">History Log</option>
+            <option value="SCADA.html">SCADA Operation</option>
+        </select>
+        <button class="icon-btn" onclick="toggleMenu()" title="Open Menu">
+            <i data-lucide="menu" size="20"></i>
+        </button>
+    </div>
+
+    <!-- MAIN APP INTERFACE -->
+    <div id="main-app">
         <!-- DASHBOARD GRID -->
         <div id="dashboard-view" class="grid">
             <div class="dash-card card-blue" onclick="openSubPage('ALL_PBS.html')">
@@ -454,7 +476,9 @@
             </div>
         </div>
 
-        <iframe id="sub-page-container" class="hidden"></iframe>
+        <div id="iframe-wrapper" class="hidden">
+            <iframe id="sub-page-container"></iframe>
+        </div>
     </div>
 
     <!-- AUTHENTICATION MODAL -->
@@ -518,7 +542,7 @@
                 <button type="submit" id="reg-btn" class="auth-btn" style="background:#16a34a;">Send Verification Code</button>
             </form>
 
-            <!-- VERIFICATION CODE STEP (3 MIN WINDOW) -->
+            <!-- VERIFICATION CODE STEP -->
             <div id="verify-step" class="hidden">
                 <p style="font-size:13px; color:#475569; margin-bottom:8px;">A 6-digit verification code has been dispatched to your Gmail. Enter it below to proceed:</p>
                 <div class="form-group">
@@ -527,7 +551,6 @@
                     <span id="timer-display" class="timer-badge">Time remaining: 03:00</span>
                 </div>
                 
-                <!-- NEW PASSWORD FIELDS (FOR FORGOT / CHANGE PWD) -->
                 <div id="new-pwd-fields" class="hidden">
                     <div class="form-group">
                         <label>New Password</label>
@@ -543,466 +566,542 @@
         </div>
     </div>
 
-   <!-- FIREBASE FIRESTORE SDK & APPLICATION LOGIC -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { 
-            getFirestore, 
-            doc, 
-            setDoc, 
-            getDocs, 
-            collection 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+ <!-- FIREBASE FIRESTORE SDK & APPLICATION LOGIC -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+        getFirestore, 
+        doc, 
+        setDoc, 
+        getDocs, 
+        collection 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDmci3tkbyClmElPUNboW8DvvvbRQ8RzaI",
-            authDomain: "my-app-auth-7212e.firebaseapp.com",
-            projectId: "my-app-auth-7212e",
-            storageBucket: "my-app-auth-7212e.firebasestorage.app",
-            messagingSenderId: "585334946683",
-            appId: "1:585334946683:web:66f8bd7998bdf7104b9bde"
-        };
+    const firebaseConfig = {
+        apiKey: "AIzaSyDmci3tkbyClmElPUNboW8DvvvbRQ8RzaI",
+        authDomain: "my-app-auth-7212e.firebaseapp.com",
+        projectId: "my-app-auth-7212e",
+        storageBucket: "my-app-auth-7212e.firebasestorage.app",
+        messagingSenderId: "585334946683",
+        appId: "1:585334946683:web:66f8bd7998bdf7104b9bde"
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-        // INITIALIZE EMAILJS
-        if (window.emailjs) {
-            emailjs.init({
-                publicKey: "tPhtNsTxSA6Wz2P2k"
-            });
+    // INITIALIZE EMAILJS
+    if (window.emailjs) {
+        emailjs.init({ publicKey: "tPhtNsTxSA6Wz2P2k" });
+    }
+
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+
+    let currentUser = null;
+    let activeVerificationCode = null;
+    let verificationPurpose = null; 
+    let pendingUserPayload = null;
+    let countdownTimer = null;
+    let timeRemaining = 180;
+
+    // Persist session to both LocalStorage and TinyDB (via App Inventor)
+    window.saveUserSession = function(userObj) {
+        const sessionStr = JSON.stringify(userObj);
+        try {
+            localStorage.setItem('active_user_session', sessionStr);
+        } catch (e) {
+            console.warn("LocalStorage error:", e);
         }
 
-        if (window.lucide) {
-            lucide.createIcons();
+        if (window.AppInventor && typeof window.AppInventor.setWebViewString === 'function') {
+            window.AppInventor.setWebViewString("LOGIN_SUCCESS:" + sessionStr);
+        }
+    };
+
+    // Check active session on load (handling browser and WebViewer state)
+    window.checkUserSession = function() {
+        let sessionData = null;
+
+        if (window.AppInventor && typeof window.AppInventor.getWebViewString === 'function') {
+            const wvString = window.AppInventor.getWebViewString();
+            if (wvString && !['home', 'sub', 'download_apk', 'LOGOUT'].includes(wvString) && !wvString.startsWith('LOGIN_SUCCESS:')) {
+                sessionData = wvString;
+            }
         }
 
-        let currentUser = null;
-        let activeVerificationCode = null;
-        let verificationPurpose = null; // 'signup', 'forgot', 'change'
-        let pendingUserPayload = null;
-        let countdownTimer = null;
-        let timeRemaining = 180; // 3 Minutes
-
-        // GLOBAL WINDOW-BOUND UTILITIES
-        window.openAuthModal = function() {
-            const modal = document.getElementById('auth-modal');
-            if (modal) modal.classList.remove('hidden');
-        };
-
-        window.closeAuthModal = function() {
-            const modal = document.getElementById('auth-modal');
-            if (modal) modal.classList.add('hidden');
-        };
-
-        window.updateSystemUI = function() {
-            if (!currentUser) return;
-            
-            const badgeUser = document.getElementById('badge-username');
-            const dispName = document.getElementById('user-display-name');
-            const dispPbs = document.getElementById('user-display-pbs');
-            const dispPhone = document.getElementById('user-display-phone');
-            const dispEmail = document.getElementById('user-display-email');
-            const dispDesig = document.getElementById('user-display-designation');
-
-            if (badgeUser) {
-                if (currentUser.name) {
-                    const nameWords = currentUser.name.trim().split(/\s+/);
-                    badgeUser.textContent = nameWords.slice(0, 2).join(' ');
-                } else {
-                    badgeUser.textContent = 'User';
-                }
-            }
-            if (dispName) dispName.innerHTML = `<i data-lucide="user-check" size="16"></i> ${currentUser.name || ''}`;
-            if (dispPbs) dispPbs.innerHTML = `<i data-lucide="building-2" size="14"></i> PBS: ${currentUser.pbs || ''}`;
-            if (dispPhone) dispPhone.innerHTML = `<i data-lucide="phone" size="14"></i> Phone: ${currentUser.phone || ''}`;
-            if (dispEmail) dispEmail.innerHTML = `<i data-lucide="mail" size="14"></i> Gmail: ${currentUser.email || ''}`;
-            if (dispDesig) dispDesig.innerHTML = `<i data-lucide="briefcase" size="14"></i> Designation: ${currentUser.designation || ''}`;
-            
-            if (window.lucide && typeof lucide.createIcons === 'function') {
-                lucide.createIcons();
-            }
-        };
-
-        window.addEventListener('DOMContentLoaded', () => {
+        if (!sessionData) {
             try {
-                const savedSession = localStorage.getItem('active_user_session');
-                if (savedSession) {
-                    currentUser = JSON.parse(savedSession);
-                    window.updateSystemUI();
-                    window.closeAuthModal();
-                } else {
-                    window.openAuthModal();
-                }
+                sessionData = localStorage.getItem('active_user_session');
             } catch (e) {
-                console.warn("Storage access restricted:", e);
+                console.warn("Storage restricted:", e);
+            }
+        }
+
+        if (sessionData) {
+            try {
+                currentUser = JSON.parse(sessionData);
+                window.updateSystemUI();
+                window.closeAuthModal();
+            } catch (err) {
+                console.error("Session parse error:", err);
                 window.openAuthModal();
             }
-        });
-
-        // FETCH ALL USERS FROM FIRESTORE
-        async function fetchAllUsers() {
-            try {
-                const querySnapshot = await getDocs(collection(db, "users"));
-                const users = [];
-                querySnapshot.forEach((doc) => {
-                    users.push(doc.data());
-                });
-                return users;
-            } catch (err) {
-                console.error("Firestore Read Error:", err);
-                alert("Database Access Error: " + err.message);
-                return [];
-            }
-        }
-
-        // SHOW/HIDE PASSWORD INPUT UTILITY
-        window.togglePasswordVisibility = function(inputId, toggleIcon) {
-            const input = document.getElementById(inputId);
-            if (!input) return;
-            if (input.type === "password") {
-                input.type = "text";
-                toggleIcon.innerHTML = `<i data-lucide="eye-off" size="18"></i>`;
-            } else {
-                input.type = "password";
-                toggleIcon.innerHTML = `<i data-lucide="eye" size="18"></i>`;
-            }
-            if (window.lucide) lucide.createIcons();
-        };
-
-        window.switchAuthTab = function(tab) {
-            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
-            document.getElementById('tab-register').classList.toggle('active', tab === 'register');
-            document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
-            document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
-            document.getElementById('verify-step').classList.add('hidden');
-        };
-
-        // 3-MINUTE TIMER MANAGEMENT
-        function startCountdown() {
-            clearInterval(countdownTimer);
-            timeRemaining = 180;
-            updateTimerDisplay();
-
-            countdownTimer = setInterval(() => {
-                timeRemaining--;
-                updateTimerDisplay();
-                if (timeRemaining <= 0) {
-                    clearInterval(countdownTimer);
-                    activeVerificationCode = null;
-                    alert("The 3-minute verification period has expired. Please request a new code.");
-                    location.reload();
-                }
-            }, 1000);
-        }
-
-        function updateTimerDisplay() {
-            const minutes = Math.floor(timeRemaining / 60);
-            const seconds = timeRemaining % 60;
-            const formattedSec = seconds < 10 ? '0' + seconds : seconds;
-            const timerEl = document.getElementById('timer-display');
-            if (timerEl) timerEl.textContent = `Time remaining: 0${minutes}:${formattedSec}`;
-        }
-
-        function generateCode() {
-            return Math.floor(100000 + Math.random() * 900000).toString();
-        }
-
-        // SIGN UP PROCESS
-        window.startSignUpVerification = async function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('reg-btn');
-            btn.disabled = true;
-            btn.textContent = "Checking records...";
-
-            const email = document.getElementById('reg-email').value.trim().toLowerCase();
-            const phone = document.getElementById('reg-phone').value.trim();
-
-            const users = await fetchAllUsers();
-
-            const emailExists = users.some(u => u.email && u.email.toLowerCase() === email);
-            const phoneExists = users.some(u => u.phone && u.phone === phone);
-
-            if (emailExists) {
-                alert("This Gmail address is already registered. Please use a different Gmail or Sign In.");
-                btn.disabled = false;
-                btn.textContent = "Send Verification Code";
-                return;
-            }
-            if (phoneExists) {
-                alert("This Mobile Number is already registered. Please use a different number or Sign In.");
-                btn.disabled = false;
-                btn.textContent = "Send Verification Code";
-                return;
-            }
-
-            pendingUserPayload = {
-                name: document.getElementById('reg-name').value.trim(),
-                pbs: document.getElementById('reg-pbs').value.trim(),
-                designation: document.getElementById('reg-designation').value.trim(),
-                phone: phone,
-                email: email,
-                password: document.getElementById('reg-password').value,
-                createdAt: new Date().toISOString()
-            };
-
-            verificationPurpose = 'signup';
-            dispatchVerificationCode(email, btn, "Send Verification Code");
-        };
-
-        // FORGOT PASSWORD PROCESS
-        window.showForgotPasswordView = async function() {
-            const identifier = prompt("Enter your registered Gmail or Mobile Number:");
-            if (!identifier) return;
-
-            const users = await fetchAllUsers();
-            const user = users.find(u => 
-                (u.email && u.email.toLowerCase() === identifier.trim().toLowerCase()) || 
-                (u.phone && u.phone === identifier.trim())
-            );
-
-            if (!user) {
-                alert("No matching user account was found.");
-                return;
-            }
-
-            pendingUserPayload = user;
-            verificationPurpose = 'forgot';
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('new-pwd-fields').classList.remove('hidden');
-            dispatchVerificationCode(user.email, null, "");
-        };
-
-        window.startChangePasswordProcess = function() {
-            if (!currentUser) return;
-
-            const confirmSend = confirm(`A verification code will be sent to your registered Gmail (${currentUser.email}). Do you want to proceed?`);
-            if (!confirmSend) return;
-
-            pendingUserPayload = currentUser;
-            verificationPurpose = 'change';
-            window.toggleMenu(); 
+        } else {
             window.openAuthModal();
-            document.getElementById('auth-tabs-header').classList.add('hidden');
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('register-form').classList.add('hidden');
-            document.getElementById('new-pwd-fields').classList.remove('hidden');
-            dispatchVerificationCode(currentUser.email, null, "");
-        };
+        }
+    };
 
-        // APP UPDATE TRIGGER (MIT APP INVENTOR ONLY)
-        window.handleAppUpdate = function() {
-            if (window.AppInventor && typeof window.AppInventor.setWebViewString === 'function') {
-                window.AppInventor.setWebViewString('download_apk');
+    window.openAuthModal = function() {
+        const modal = document.getElementById('auth-modal');
+        if (modal) modal.classList.remove('hidden');
+    };
+
+    window.closeAuthModal = function() {
+        const modal = document.getElementById('auth-modal');
+        if (modal) modal.classList.add('hidden');
+    };
+
+   window.updateSystemUI = function() {
+    const badgeUser = document.getElementById('badge-username');
+    const dispName = document.getElementById('user-display-name');
+    const dispPbs = document.getElementById('user-display-pbs');
+    const dispPhone = document.getElementById('user-display-phone');
+    const dispEmail = document.getElementById('user-display-email');
+    const dispDesig = document.getElementById('user-display-designation');
+
+    if (!currentUser) {
+        if (badgeUser) badgeUser.textContent = 'Guest';
+        if (dispName) dispName.innerHTML = `<i data-lucide="user-check" size="16"></i> Guest User`;
+        if (dispPbs) dispPbs.innerHTML = `<i data-lucide="building-2" size="14"></i> PBS: Not Authorized`;
+        if (dispPhone) dispPhone.innerHTML = `<i data-lucide="phone" size="14"></i> Phone: N/A`;
+        if (dispEmail) dispEmail.innerHTML = `<i data-lucide="mail" size="14"></i> Gmail: N/A`;
+        if (dispDesig) dispDesig.innerHTML = `<i data-lucide="briefcase" size="14"></i> Designation: Guest`;
+    } else {
+        if (badgeUser) {
+            if (currentUser.name) {
+                const nameWords = currentUser.name.trim().split(/\s+/);
+                badgeUser.textContent = nameWords.slice(0, 2).join(' ');
             } else {
-                alert("App updates can only be downloaded inside the installed app.");
+                badgeUser.textContent = 'User';
             }
-        };
-
-        // EMAIL DISPATCH VIA EMAILJS & WRITE OTP TO FIRESTORE
-        function dispatchVerificationCode(email, btnElement, originalBtnText) {
-            activeVerificationCode = generateCode();
-
-            const templateParams = {
-                to_email: email,
-                passcode: activeVerificationCode,
-                verification_code: activeVerificationCode,
-                message: "Your 6-digit verification code is " + activeVerificationCode + ". It will expire in 3 minutes."
-            };
-
-            emailjs.send('service_fg4gi7n', 'template_4wxbi0t', templateParams)
-                .then(async () => {
-                    const otpDocId = email.replace(/[^a-zA-Z0-9]/g, "_");
-                    await setDoc(doc(db, "otp_codes", otpDocId), {
-                        email: email,
-                        code: activeVerificationCode,
-                        createdAt: new Date().toISOString()
-                    });
-
-                    alert(`Verification code sent to ${email}. Check your inbox.`);
-                    document.getElementById('auth-tabs-header').classList.add('hidden');
-                    document.getElementById('login-form').classList.add('hidden');
-                    document.getElementById('register-form').classList.add('hidden');
-                    document.getElementById('verify-step').classList.remove('hidden');
-                    startCountdown();
-                })
-                .catch((error) => {
-                    alert("Failed to send verification code. Please verify your connection or email address.");
-                    console.error("Email Error:", error);
-                })
-                .finally(() => {
-                    if (btnElement) {
-                        btnElement.disabled = false;
-                        btnElement.textContent = originalBtnText;
-                    }
-                });
         }
 
-        // CONFIRM CODE & COMMIT TO FIRESTORE
-        window.confirmVerificationCode = async function() {
-            const enteredCode = document.getElementById('verification-code-input').value.trim();
-            const btn = document.getElementById('confirm-code-btn');
+        if (dispName) dispName.innerHTML = `<i data-lucide="user-check" size="16"></i> ${currentUser.name || ''}`;
+        if (dispPbs) dispPbs.innerHTML = `<i data-lucide="building-2" size="14"></i> PBS: ${currentUser.pbs || ''}`;
+        if (dispPhone) dispPhone.innerHTML = `<i data-lucide="phone" size="14"></i> Phone: ${currentUser.phone || ''}`;
+        if (dispEmail) dispEmail.innerHTML = `<i data-lucide="mail" size="14"></i> Gmail: ${currentUser.email || ''}`;
+        if (dispDesig) dispDesig.innerHTML = `<i data-lucide="briefcase" size="14"></i> Designation: ${currentUser.designation || ''}`;
+    }
+    
+    if (window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+    }
+};
 
-            if (!activeVerificationCode || enteredCode !== activeVerificationCode) {
-                alert("Invalid verification code. Please check your email and try again.");
-                return;
+    window.addEventListener('DOMContentLoaded', () => {
+        history.pushState({ page: 'home' }, "", "#home");
+        window.checkUserSession();
+    });
+
+    window.addEventListener('popstate', (event) => {
+        const wrapper = document.getElementById('iframe-wrapper');
+        if (wrapper && !wrapper.classList.contains('hidden')) {
+            window.backToHome(false);
+        } else {
+            history.pushState({ page: 'home' }, "", "#home");
+            if (window.AppInventor && typeof window.AppInventor.setWebViewString === 'function') {
+                window.AppInventor.setWebViewString('home');
             }
+        }
+    });
 
-            btn.disabled = true;
-            btn.textContent = "Processing...";
+    async function fetchAllUsers() {
+        try {
+            const querySnapshot = await getDocs(collection(db, "users"));
+            const users = [];
+            querySnapshot.forEach((doc) => { users.push(doc.data()); });
+            return users;
+        } catch (err) {
+            console.error("Firestore Read Error:", err);
+            alert("Database Access Error: " + err.message);
+            return [];
+        }
+    }
 
-            clearInterval(countdownTimer);
+    window.togglePasswordVisibility = function(inputId, toggleIcon) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        if (input.type === "password") {
+            input.type = "text";
+            toggleIcon.innerHTML = `<i data-lucide="eye-off" size="18"></i>`;
+        } else {
+            input.type = "password";
+            toggleIcon.innerHTML = `<i data-lucide="eye" size="18"></i>`;
+        }
+        if (window.lucide) lucide.createIcons();
+    };
 
-            try {
-                const userDocId = pendingUserPayload.email.replace(/[^a-zA-Z0-9]/g, "_");
+    window.switchAuthTab = function(tab) {
+        document.getElementById('auth-tabs-header').classList.remove('hidden');
+        document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+        document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+        document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+        document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+        document.getElementById('verify-step').classList.add('hidden');
+    };
 
-                if (verificationPurpose === 'signup') {
-                    await setDoc(doc(db, "users", userDocId), pendingUserPayload);
+    function startCountdown() {
+        clearInterval(countdownTimer);
+        timeRemaining = 180;
+        updateTimerDisplay();
 
-                    currentUser = pendingUserPayload;
-                    try {
-                        localStorage.setItem('active_user_session', JSON.stringify(currentUser));
-                    } catch (e) {
-                        console.warn("Storage restricted:", e);
-                    }
-                    alert("Account created successfully!");
-                } 
-                else if (verificationPurpose === 'forgot' || verificationPurpose === 'change') {
-                    const newPwd = document.getElementById('reset-new-password').value;
-                    if (!newPwd || newPwd.length < 4) {
-                        alert("Please enter a valid new password.");
-                        btn.disabled = false;
-                        btn.textContent = "Confirm Code";
-                        return;
-                    }
-
-                    pendingUserPayload.password = newPwd;
-                    
-                    await setDoc(doc(db, "users", userDocId), pendingUserPayload, { merge: true });
-
-                    if (verificationPurpose === 'change') {
-                        currentUser = pendingUserPayload;
-                        try {
-                            localStorage.setItem('active_user_session', JSON.stringify(currentUser));
-                        } catch (e) {
-                            console.warn("Storage restricted:", e);
-                        }
-                    }
-
-                    alert("Password updated successfully! Please sign in with your new password.");
-                }
-                location.reload();
-            } catch (err) {
-                console.error("Firestore Write Error:", err);
-                alert("Failed to update database records: " + err.message);
-                btn.disabled = false;
-                btn.textContent = "Confirm Code";
+        countdownTimer = setInterval(() => {
+            timeRemaining--;
+            updateTimerDisplay();
+            if (timeRemaining <= 0) {
+                clearInterval(countdownTimer);
+                activeVerificationCode = null;
+                alert("The 3-minute verification period has expired. Please request a new code.");
+                
+                document.getElementById('verification-code-input').value = '';
+                document.getElementById('verify-step').classList.add('hidden');
+                window.switchAuthTab('login');
+                window.openAuthModal();
             }
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        const minutes = Math.floor(timeRemaining / 60);
+        const seconds = timeRemaining % 60;
+        const formattedSec = seconds < 10 ? '0' + seconds : seconds;
+        const timerEl = document.getElementById('timer-display');
+        if (timerEl) timerEl.textContent = `Time remaining: 0${minutes}:${formattedSec}`;
+    }
+
+    function generateCode() {
+        return Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    window.startSignUpVerification = async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('reg-btn');
+        btn.disabled = true;
+        btn.textContent = "Checking records...";
+
+        const email = document.getElementById('reg-email').value.trim().toLowerCase();
+        const phone = document.getElementById('reg-phone').value.trim();
+
+        const users = await fetchAllUsers();
+
+        const emailExists = users.some(u => u.email && u.email.toLowerCase() === email);
+        const phoneExists = users.some(u => u.phone && u.phone === phone);
+
+        if (emailExists) {
+            alert("This Gmail address is already registered. Please use a different Gmail or Sign In.");
+            btn.disabled = false;
+            btn.textContent = "Send Verification Code";
+            return;
+        }
+        if (phoneExists) {
+            alert("This Mobile Number is already registered. Please use a different number or Sign In.");
+            btn.disabled = false;
+            btn.textContent = "Send Verification Code";
+            return;
+        }
+
+        pendingUserPayload = {
+            name: document.getElementById('reg-name').value.trim(),
+            pbs: document.getElementById('reg-pbs').value.trim(),
+            designation: document.getElementById('reg-designation').value.trim(),
+            phone: phone,
+            email: email,
+            password: document.getElementById('reg-password').value,
+            createdAt: new Date().toISOString()
         };
 
-        // LOGIN HANDLER
-        window.handleLogin = async function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('login-btn');
-            btn.disabled = true;
-            btn.textContent = "Authenticating...";
+        verificationPurpose = 'signup';
+        dispatchVerificationCode(email, btn, "Send Verification Code");
+    };
 
-            try {
-                const idInput = document.getElementById('login-id').value.trim();
-                const passwordInput = document.getElementById('login-password').value;
+    window.showForgotPasswordView = async function() {
+        const identifier = prompt("Enter your registered Gmail or Mobile Number:");
+        if (!identifier) return;
 
-                const users = await fetchAllUsers();
+        const users = await fetchAllUsers();
+        const user = users.find(u => 
+            (u.email && u.email.toLowerCase() === identifier.trim().toLowerCase()) || 
+            (u.phone && u.phone === identifier.trim())
+        );
 
-                if (!users || users.length === 0) {
+        if (!user) {
+            alert("No matching user account was found.");
+            return;
+        }
+
+        pendingUserPayload = user;
+        verificationPurpose = 'forgot';
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('new-pwd-fields').classList.remove('hidden');
+        dispatchVerificationCode(user.email, null, "");
+    };
+
+    window.startChangePasswordProcess = function() {
+        if (!currentUser) return;
+
+        const confirmSend = confirm(`A verification code will be sent to your registered Gmail (${currentUser.email}). Do you want to proceed?`);
+        if (!confirmSend) return;
+
+        pendingUserPayload = currentUser;
+        verificationPurpose = 'change';
+        window.toggleMenu(); 
+        window.openAuthModal();
+        document.getElementById('auth-tabs-header').classList.add('hidden');
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('register-form').classList.add('hidden');
+        document.getElementById('new-pwd-fields').classList.remove('hidden');
+        dispatchVerificationCode(currentUser.email, null, "");
+    };
+
+    window.handleAppUpdate = function() {
+        if (window.AppInventor && typeof window.AppInventor.setWebViewString === 'function') {
+            window.AppInventor.setWebViewString('download_apk');
+        } else {
+            alert("App updates can only be downloaded inside the installed app.");
+        }
+    };
+
+    function dispatchVerificationCode(email, btnElement, originalBtnText) {
+        activeVerificationCode = generateCode();
+
+        const templateParams = {
+            to_email: email,
+            passcode: activeVerificationCode,
+            verification_code: activeVerificationCode,
+            message: "Your 6-digit verification code is " + activeVerificationCode + ". It will expire in 3 minutes."
+        };
+
+        emailjs.send('service_fg4gi7n', 'template_4wxbi0t', templateParams)
+            .then(async () => {
+                const otpDocId = email.replace(/[^a-zA-Z0-9]/g, "_");
+                await setDoc(doc(db, "otp_codes", otpDocId), {
+                    email: email,
+                    code: activeVerificationCode,
+                    createdAt: new Date().toISOString()
+                });
+
+                alert(`Verification code sent to ${email}. Check your inbox.`);
+                document.getElementById('auth-tabs-header').classList.add('hidden');
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('register-form').classList.add('hidden');
+                document.getElementById('verify-step').classList.remove('hidden');
+                startCountdown();
+            })
+            .catch((error) => {
+                alert("Failed to send verification code. Please verify your connection or email address.");
+                console.error("Email Error:", error);
+            })
+            .finally(() => {
+                if (btnElement) {
+                    btnElement.disabled = false;
+                    btnElement.textContent = originalBtnText;
+                }
+            });
+    }
+
+    window.confirmVerificationCode = async function() {
+        const enteredCode = document.getElementById('verification-code-input').value.trim();
+        const btn = document.getElementById('confirm-code-btn');
+
+        if (!activeVerificationCode || enteredCode !== activeVerificationCode) {
+            alert("Invalid verification code. Please check your email and try again.");
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Processing...";
+
+        clearInterval(countdownTimer);
+
+        try {
+            const userDocId = pendingUserPayload.email.replace(/[^a-zA-Z0-9]/g, "_");
+
+            if (verificationPurpose === 'signup') {
+                await setDoc(doc(db, "users", userDocId), pendingUserPayload);
+
+                currentUser = pendingUserPayload;
+                window.saveUserSession(currentUser);
+
+                alert("Account created successfully!");
+                window.updateSystemUI();
+                window.closeAuthModal();
+            } 
+            else if (verificationPurpose === 'forgot' || verificationPurpose === 'change') {
+                const newPwd = document.getElementById('reset-new-password').value;
+                if (!newPwd || newPwd.length < 4) {
+                    alert("Please enter a valid new password.");
                     btn.disabled = false;
-                    btn.textContent = "Sign In";
+                    btn.textContent = "Confirm Code";
                     return;
                 }
 
-                const userMatch = users.find(u => 
-                    (u.email && u.email.toLowerCase() === idInput.toLowerCase() || u.phone === idInput) && u.password === passwordInput
-                );
+                pendingUserPayload.password = newPwd;
+                
+                await setDoc(doc(db, "users", userDocId), pendingUserPayload, { merge: true });
 
-                if (userMatch) {
-                    currentUser = userMatch;
-                    
-                    try {
-                        localStorage.setItem('active_user_session', JSON.stringify(currentUser));
-                    } catch (err) {
-                        console.warn("LocalStorage blocked by WebViewer, continuing session in memory:", err);
-                    }
-
+                if (verificationPurpose === 'change') {
+                    currentUser = pendingUserPayload;
+                    window.saveUserSession(currentUser);
                     window.updateSystemUI();
                     window.closeAuthModal();
                 } else {
-                    alert("Invalid Gmail/Mobile Number or Password. Please try again.");
+                    alert("Password updated successfully! Please sign in with your new password.");
+                    window.switchAuthTab('login');
+                    window.openAuthModal();
                 }
-            } catch (authError) {
-                alert("Authentication Exception: " + authError.message);
-            } finally {
+            }
+
+            pendingUserPayload = null;
+            activeVerificationCode = null;
+            document.getElementById('verification-code-input').value = '';
+            document.getElementById('reset-new-password').value = '';
+            document.getElementById('new-pwd-fields').classList.add('hidden');
+            document.getElementById('verify-step').classList.add('hidden');
+
+        } catch (err) {
+            console.error("Firestore Write Error:", err);
+            alert("Failed to update database records: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Confirm Code";
+        }
+    };
+
+    window.handleLogin = async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('login-btn');
+        btn.disabled = true;
+        btn.textContent = "Authenticating...";
+
+        try {
+            const idInput = document.getElementById('login-id').value.trim();
+            const passwordInput = document.getElementById('login-password').value;
+
+            const users = await fetchAllUsers();
+
+            if (!users || users.length === 0) {
                 btn.disabled = false;
                 btn.textContent = "Sign In";
-            }
-        };
-
-        window.handleSignOut = function() {
-            try {
-                localStorage.removeItem('active_user_session');
-            } catch (e) {
-                console.warn("Storage clear restricted:", e);
-            }
-            location.reload();
-        };
-
-        window.toggleMenu = function() {
-            document.getElementById('sidebar').classList.toggle('active');
-            document.getElementById('overlay').classList.toggle('active');
-        };
-
-        window.toggleAccordion = function(contentId, arrowId) {
-            const content = document.getElementById(contentId);
-            const arrow = document.getElementById(arrowId);
-            if (content) content.classList.toggle('open');
-            if (arrow && content) arrow.style.transform = content.classList.contains('open') ? "rotate(180deg)" : "rotate(0deg)";
-        };
-
-        // DYNAMIC PAGE SWITCHING UTILITIES
-        window.openSubPage = (fileName) => {
-            if (!currentUser) {
-                window.openAuthModal();
                 return;
             }
-            const iframe = document.getElementById('sub-page-container');
-            iframe.src = fileName;
-            iframe.classList.remove('hidden');
-            document.getElementById('dashboard-view').classList.add('hidden');
-            document.getElementById('pc-back-btn').style.display = 'flex';
 
-            // Show and synchronize header dropdown selector
-            const titleEl = document.getElementById('header-main-title');
-            const dropEl = document.getElementById('header-nav-dropdown');
-            if (titleEl && dropEl) {
-                titleEl.classList.add('hidden');
-                dropEl.classList.remove('hidden');
-                dropEl.value = fileName;
+            const userMatch = users.find(u => 
+                (u.email && u.email.toLowerCase() === idInput.toLowerCase() || u.phone === idInput) && u.password === passwordInput
+            );
+
+            if (userMatch) {
+                currentUser = userMatch;
+                window.saveUserSession(currentUser);
+                window.updateSystemUI();
+                window.closeAuthModal();
+            } else {
+                alert("Invalid Gmail/Mobile Number or Password. Please try again.");
             }
-        };
+        } catch (authError) {
+            alert("Authentication Exception: " + authError.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Sign In";
+        }
+    };
 
-        window.backToHome = function() {
-            const iframe = document.getElementById('sub-page-container');
-            iframe.classList.add('hidden');
-            iframe.src = "";
-            document.getElementById('dashboard-view').classList.remove('hidden');
-            document.getElementById('pc-back-btn').style.display = 'none';
+    window.handleSignOut = function() {
+        try {
+            localStorage.removeItem('active_user_session');
+        } catch (e) {
+            console.warn("Storage clear restricted:", e);
+        }
 
-            // Restore primary title
-            const titleEl = document.getElementById('header-main-title');
-            const dropEl = document.getElementById('header-nav-dropdown');
-            if (titleEl && dropEl) {
-                titleEl.classList.remove('hidden');
-                dropEl.classList.add('hidden');
-            }
-        };
-    </script>
+        if (window.AppInventor && typeof window.AppInventor.setWebViewString === 'function') {
+            window.AppInventor.setWebViewString('LOGOUT');
+        }
+        
+        currentUser = null;
+        window.updateSystemUI();
+
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        if (sidebar) sidebar.classList.remove('active');
+        if (overlay) overlay.classList.remove('active');
+
+        const wrapper = document.getElementById('iframe-wrapper');
+        if (wrapper && !wrapper.classList.contains('hidden')) {
+            window.backToHome(false);
+        }
+
+        window.switchAuthTab('login');
+        window.openAuthModal();
+    };
+
+    window.toggleMenu = function() {
+        document.getElementById('sidebar').classList.toggle('active');
+        document.getElementById('overlay').classList.toggle('active');
+    };
+
+    window.toggleAccordion = function(contentId, arrowId) {
+        const content = document.getElementById(contentId);
+        const arrow = document.getElementById(arrowId);
+        if (content) content.classList.toggle('open');
+        if (arrow && content) arrow.style.transform = content.classList.contains('open') ? "rotate(180deg)" : "rotate(0deg)";
+    };
+
+    window.openSubPage = (fileName) => {
+        if (!currentUser) {
+            window.openAuthModal();
+            return;
+        }
+        
+        if (window.AppInventor && typeof window.AppInventor.setWebViewString === 'function') {
+            window.AppInventor.setWebViewString('sub');
+        }
+        
+        document.getElementById('main-header-bar').classList.add('hidden');
+        document.getElementById('sub-page-toolbar').classList.remove('hidden');
+        
+        const selectEl = document.getElementById('sub-page-select');
+        if (selectEl) selectEl.value = fileName;
+
+        const iframe = document.getElementById('sub-page-container');
+        iframe.src = fileName;
+        
+        document.getElementById('iframe-wrapper').classList.remove('hidden');
+        document.getElementById('dashboard-view').classList.add('hidden');
+
+        history.pushState({ subPageOpen: true }, "", "#" + fileName.replace('.html', ''));
+    };
+
+    window.switchSubPageFromDropdown = (fileName) => {
+        if (!fileName) return;
+        const iframe = document.getElementById('sub-page-container');
+        iframe.src = fileName;
+        history.replaceState({ subPageOpen: true }, "", "#" + fileName.replace('.html', ''));
+    };
+
+    window.backToHome = function(pushState = true) {
+        if (window.AppInventor && typeof window.AppInventor.setWebViewString === 'function') {
+            window.AppInventor.setWebViewString('home');
+        }
+
+        document.getElementById('sub-page-toolbar').classList.add('hidden');
+        document.getElementById('main-header-bar').classList.remove('hidden');
+        
+        const wrapper = document.getElementById('iframe-wrapper');
+        const iframe = document.getElementById('sub-page-container');
+        wrapper.classList.add('hidden');
+        iframe.src = "";
+        document.getElementById('dashboard-view').classList.remove('hidden');
+    };
+</script>
 </body>
 </html>
