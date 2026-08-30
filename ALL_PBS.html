@@ -184,9 +184,9 @@ function renderCards() {
 
     for (let pbs in firebaseData) {            
         if (pbsFilter !== "ALL" && pbs !== pbsFilter) continue;                            
-        let pbsOnCount = 0; 
-        let pbsOnlineFeederTotal = 0; 
-        let pbsGrandFeederTotal = 0;          
+        let pbsOnCount = 0;
+        let pbsOnlineFeederTotal = 0;
+        let pbsGrandFeederTotal = 0;            
         let pbsOnlineSubs = 0;            
         let pbsTotalPowerMW = 0.0;        
         let pbsTotalSubs = Object.keys(firebaseData[pbs] || {}).length;
@@ -198,28 +198,44 @@ function renderCards() {
                 if ((now - hb) < TIMEOUT_MS) isSubOnline = true;                  
             }
 
-            // Count feeders for all substations regardless of status
+            // Loop through all devices/relays to compute totals
             for (let dev in firebaseData[pbs][sub]) {
                 for (let relay in firebaseData[pbs][sub][dev]) {
                     if (["power", "deviceStatus", "lastHeartbeat"].includes(relay)) continue;
+                    
+                    // Grand total includes every relay/feeder in all substations
                     pbsGrandFeederTotal++;
+
+                    if (isSubOnline) {
+                        // Online total includes relays/feeders in online substations only
+                        pbsOnlineFeederTotal++;
+                        if (firebaseData[pbs][sub][dev][relay].status === "ON") {
+                            pbsOnCount++;
+                        }
+                    }
                 }
             }
 
             if (isSubOnline) {                        
                 pbsOnlineSubs++;                        
-                for (let dev in firebaseData[pbs][sub]) {                              
+                for (let dev in firebaseData[pbs][sub]) { 
+                    let hasFeederPower = false;
                     for (let relay in firebaseData[pbs][sub][dev]) {                                    
                         if (["power", "deviceStatus", "lastHeartbeat"].includes(relay)) continue;                                    
-                        pbsOnlineFeederTotal++;                                    
-                        if (firebaseData[pbs][sub][dev][relay].status === "ON") pbsOnCount++;                              
+                        const fPwr = firebaseData[pbs][sub][dev][relay].power;
+                        if (fPwr && fPwr.P !== undefined) {
+                            pbsTotalPowerMW += Number(fPwr.P || 0);
+                            hasFeederPower = true;
+                        }
                     }                                                
-                    const pwr = firebaseData[pbs][sub][dev].power || {};                    
-                    if (pwr && Object.keys(pwr).length > 0) {                        
-                        const p1 = Number(pwr.P1 ?? pwr.P ?? pwr.p ?? 0);                        
-                        const p2 = Number(pwr.P2 ?? 0);                        
-                        pbsTotalPowerMW += (p1 + p2);                    
-                    }                
+                    if (!hasFeederPower) {
+                        const pwr = firebaseData[pbs][sub][dev].power || {};                    
+                        if (pwr && Object.keys(pwr).length > 0) {                        
+                            const p1 = Number(pwr.P1 ?? pwr.P ?? pwr.p ?? 0);                        
+                            const p2 = Number(pwr.P2 ?? 0);                        
+                            pbsTotalPowerMW += (p1 + p2);                    
+                        }                
+                    }
                 }                  
             }            
         }                    
@@ -229,7 +245,7 @@ function renderCards() {
             <h2 style="margin:0; font-size:18px;">${pbs} Summary</h2>                    
             <div style="margin-top:5px; font-size:14px;">                            
                 Substations Online: <b>${pbsOnlineSubs} / ${pbsTotalSubs}</b><br>                            
-                Feeders ON: <b>${pbsOnCount} / ${pbsOnlineFeederTotal}</b> <span style="font-size:12px; color:#555;">(Total: ${pbsGrandFeederTotal})</span><br>                
+                Feeders ON: <b>${pbsOnCount} / ${pbsOnlineFeederTotal}</b> <span style="color:#777; font-size:12px; font-weight:normal;">(Total: ${pbsGrandFeederTotal})</span><br>                
                 Total Power: <b style="color:#0d47a1;">${pbsTotalPowerMW.toFixed(2)} MW</b>            
             </div></div>`;            
         container.appendChild(pbsHeader);
@@ -257,8 +273,9 @@ function renderCards() {
                     for (let relay in device) {                                        
                         if (["power", "deviceStatus", "lastHeartbeat"].includes(relay)) continue;                                       
                         subTotalCount++;                                       
-                        if (device[relay].status === "ON") subOnCount++;                                
+                        if (device[relay].status === "ON") subOnCount++; 
                     }                                                    
+                    
                     const pwr = device.power || {};                                
                     if (pwr && Object.keys(pwr).length > 0) {                                      
                         subV1 += Number(pwr.V1 ?? pwr.V ?? pwr.v ?? 0);                         
@@ -268,7 +285,7 @@ function renderCards() {
                         subF1 += Number(pwr.F1 ?? pwr.F ?? pwr.f ?? 0);                         
                         count1++;
 
-                        if (pwr.V2 !== undefined || pwr.I2 !== undefined) {                            
+                        if (pwr.V2 !== undefined || pwr.I2 !== undefined || pwr.P2 !== undefined) {                            
                             hasPZEM2 = true;                            
                             subV2 += Number(pwr.V2 || 0);                             
                             subI2 += Number(pwr.I2 || 0);                                          
@@ -281,6 +298,12 @@ function renderCards() {
                 }                  
             }
 
+            const displayV1  = count1 ? (subV1 / count1).toFixed(2) : "0.00";
+            const displayI1  = subI1.toFixed(2);
+            const displayP1  = subP1.toFixed(2);
+            const displayPF1 = count1 ? (subPF1 / count1).toFixed(2) : "0.00";
+            const displayF1  = count1 ? (subF1 / count1).toFixed(2) : "0.00";
+
             let powerDisplayHtml = "";            
             if (isSubOnline) {                
                 if (hasPZEM2) {                    
@@ -288,30 +311,30 @@ function renderCards() {
                     <div class="pwr-box">                        
                         <div class="pwr-header">Unit-1</div>                        
                         <div class="pwr-grid">                            
-                            <div><b style="color:#555;">V:</b> ${(count1 ? (subV1/count1).toFixed(2) : 0)}KV</div>                            
-                            <div><b style="color:#555;">I:</b> ${subI1.toFixed(2)}A</div>                            
-                            <div><b style="color:#555;">P:</b> ${subP1.toFixed(2)}MW</div>                            
-                            <div><b style="color:#555;">PF:</b> ${(count1 ? (subPF1/count1).toFixed(2) : 0)}</div>                            
-                            <div><b style="color:#555;">F:</b> ${(count1 ? (subF1/count1).toFixed(2) : 0)}Hz</div>                        
+                            <div><b style="color:#555;">V:</b> ${displayV1}KV</div>                            
+                            <div><b style="color:#555;">I:</b> ${displayI1}A</div>                            
+                            <div><b style="color:#555;">P:</b> <span style="color:#0d47a1; font-weight:bold;">${displayP1}MW</span></div>                            
+                            <div><b style="color:#555;">PF:</b> ${displayPF1}</div>                            
+                            <div><b style="color:#555;">F:</b> ${displayF1}Hz</div>                        
                         </div>                        
                         <div class="pwr-header" style="margin-top:6px;">Unit-2</div>                        
                         <div class="pwr-grid">                            
-                            <div><b style="color:#555;">V:</b> ${(count2 ? (subV2/count2).toFixed(2) : 0)}KV</div>                            
+                            <div><b style="color:#555;">V:</b> ${(count2 ? (subV2/count2).toFixed(2) : "0.00")}KV</div>                            
                             <div><b style="color:#555;">I:</b> ${subI2.toFixed(2)}A</div>                            
                             <div><b style="color:#555;">P:</b> ${subP2.toFixed(2)}MW</div>                            
-                            <div><b style="color:#555;">PF:</b> ${(count2 ? (subPF2/count2).toFixed(2) : 0)}</div>                            
-                            <div><b style="color:#555;">F:</b> ${(count2 ? (subF2/count2).toFixed(2) : 0)}Hz</div>                        
+                            <div><b style="color:#555;">PF:</b> ${(count2 ? (subPF2/count2).toFixed(2) : "0.00")}</div>                            
+                            <div><b style="color:#555;">F:</b> ${(count2 ? (subF2/count2).toFixed(2) : "0.00")}Hz</div>                        
                         </div>                    
                     </div>`;                
                 } else {                    
                     powerDisplayHtml = `                    
                     <div class="pwr-box">                        
                         <div class="pwr-grid">                            
-                            <div><b style="color:#555;">V:</b> ${(count1 ? (subV1/count1).toFixed(2) : 0)}KV</div>                            
-                            <div><b style="color:#555;">I:</b> ${subI1.toFixed(2)}A</div>                            
-                            <div><b style="color:#555;">P:</b> ${subP1.toFixed(2)}MW</div>                            
-                            <div><b style="color:#555;">PF:</b> ${(count1 ? (subPF1/count1).toFixed(2) : 0)}</div>                            
-                            <div><b style="color:#555;">F:</b> ${(count1 ? (subF1/count1).toFixed(2) : 0)}Hz</div>                        
+                            <div><b style="color:#555;">V:</b> ${displayV1}KV</div>                            
+                            <div><b style="color:#555;">I:</b> ${displayI1}A</div>                            
+                            <div><b style="color:#555;">P:</b> <span style="color:#0d47a1; font-weight:bold;">${displayP1}MW</span></div>                            
+                            <div><b style="color:#555;">PF:</b> ${displayPF1}</div>                            
+                            <div><b style="color:#555;">F:</b> ${displayF1}Hz</div>                        
                         </div>                    
                     </div>`;                
                 }            
@@ -359,7 +382,25 @@ function renderCards() {
                     cardMap[id] = { pbs, sub, dev, relay };
 
                     const displayStatus = isSubOnline ? (fb.status || "--") : "--";                              
-                    const ledClass = isSubOnline ? (fb.status==="ON" ? "on" : "off blink") : "";
+                    const ledClass = isSubOnline ? (fb.status === "ON" ? "on" : "off blink") : "";
+
+                    let feederPowerHtml = "";
+                    if (isSubOnline && fb.power && typeof fb.power === "object") {
+                        const fV  = Number(fb.power.V ?? 0).toFixed(1);
+                        const fI  = Number(fb.power.I ?? 0).toFixed(1);
+                        const fP  = Number(fb.power.P ?? 0).toFixed(2);
+                        const fPF = Number(fb.power.PF ?? 0).toFixed(2);
+                        
+                        feederPowerHtml = `
+                            <div class="pwr-box" style="margin-top:6px; background:#f8f9fa; border:1px solid #e3f2fd;">
+                                <div class="pwr-grid" style="grid-template-columns: repeat(4, 1fr); font-size:10px;">
+                                    <div><b style="color:#555;">V:</b> ${fV}kV</div>
+                                    <div><b style="color:#555;">I:</b> ${fI}A</div>
+                                    <div><b style="color:#555;">P:</b> ${fP}MW</div>
+                                    <div><b style="color:#555;">PF:</b> ${fPF}</div>
+                                </div>
+                            </div>`;
+                    }
 
                     const fault = faults.find(f =>                                    
                         String(f.pbs || f.PBS || "").trim().toUpperCase() === String(pbs).trim().toUpperCase() &&                                    
@@ -395,6 +436,7 @@ function renderCards() {
                                 <div class="label">${relay.toUpperCase()}</div>                                    
                             </div>                                    
                             <div class="statusText">Status: ${displayStatus}</div>                                    
+                            ${feederPowerHtml}
                             <div id="details_${id}" class="details-section">                                          
                                 <div class="trip">This Month: ${row?.thisMonthTrips ?? "..."}</div>                                          
                                 <div class="trip">Last Month: ${row?.lastMonthTrips ?? "..."}</div>                                          
