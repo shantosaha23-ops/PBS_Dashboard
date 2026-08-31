@@ -152,49 +152,58 @@
         /* Top Left Controls Layout */
         .top-left-controls {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 15px;
+            left: 15px;
             z-index: 2001;
             display: flex;
             flex-direction: column;
             gap: 10px;
             font-family: system-ui, -apple-system, sans-serif;
             pointer-events: auto;
-            max-width: 360px;
+            max-width: 320px;
         }
 
         .top-left-row {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             align-items: flex-start;
         }
 
-        /* Feeder Search Bar */
+        /* Feeder Search Bar (Collapsible Icon) */
         .feeder-search-container {
-            width: 175px;
             position: relative;
         }
 
         .search-input-wrapper {
             position: relative;
-            display: flex;
+            display: none;
             align-items: center;
-            background: rgba(30, 41, 59, 0.88);
+            background: rgba(30, 41, 59, 0.92);
             backdrop-filter: blur(8px);
             border: 2px solid rgba(255, 255, 255, 0.6);
-            border-radius: 8px;
+            border-radius: 6px;
             box-shadow: 0 4px 14px rgba(0,0,0,0.5);
             overflow: hidden;
+            width: 220px;
+            animation: fadeInExpand 0.2s ease-out forwards;
+        }
+        .search-input-wrapper.active {
+            display: flex;
+        }
+
+        @keyframes fadeInExpand {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
 
         .search-input-wrapper input {
             width: 100%;
-            padding: 9px 10px;
+            padding: 7px 10px;
             background: transparent;
             border: none;
             outline: none;
             color: #ffffff;
-            font-size: 12.5px;
+            font-size: 12px;
             font-weight: 600;
         }
 
@@ -206,7 +215,7 @@
             background: none;
             border: none;
             color: #94a3b8;
-            font-size: 15px;
+            font-size: 14px;
             cursor: pointer;
             padding: 0 8px;
             display: none;
@@ -219,7 +228,7 @@
             left: 0;
             right: 0;
             margin-top: 6px;
-            background: rgba(15, 23, 42, 0.95);
+            background: rgba(15, 23, 42, 0.96);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 8px;
@@ -231,9 +240,9 @@
         }
 
         .search-result-item {
-            padding: 9px 12px;
+            padding: 8px 12px;
             color: #e2e8f0;
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: bold;
             cursor: pointer;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -246,42 +255,21 @@
             color: #ffffff;
         }
 
-        /* Electric Poles Top Widget Container */
+        /* Electric Poles Top Widget Container (Collapsible Icon) */
         .poles-widget-container {
-            width: 165px;
             position: relative;
-        }
-
-        .poles-toggle-wrapper {
-            display: flex;
-            align-items: center;
-            background: rgba(30, 41, 59, 0.88);
-            backdrop-filter: blur(8px);
-            border: 2px solid rgba(255, 255, 255, 0.6);
-            border-radius: 8px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-            padding: 9px 12px;
-            cursor: pointer;
-            color: #ffffff;
-            font-size: 12.5px;
-            font-weight: 600;
-            justify-content: space-between;
-            user-select: none;
-        }
-        .poles-toggle-wrapper:hover {
-            background: rgba(51, 65, 85, 0.9);
         }
 
         .custom-poles-dropdown {
             position: absolute;
             top: 100%;
             left: 0;
-            right: 0;
             margin-top: 6px;
-            background: rgba(15, 23, 42, 0.95);
+            background: rgba(15, 23, 42, 0.96);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 8px;
+            width: 210px;
             max-height: 240px;
             overflow-y: auto;
             box-shadow: 0 8px 20px rgba(0,0,0,0.6);
@@ -291,6 +279,7 @@
         }
         .custom-poles-dropdown.active {
             display: block;
+            animation: fadeInExpand 0.2s ease-out forwards;
         }
 
         .poles-dropdown-title {
@@ -327,7 +316,7 @@
         .status-bar-widget {
             display: flex;
             gap: 8px;
-            width: 100%;
+            width: 220px;
         }
 
         .status-card {
@@ -336,7 +325,7 @@
             backdrop-filter: blur(8px);
             border: 2px solid rgba(255, 255, 255, 0.5);
             border-radius: 8px;
-            padding: 7px 10px;
+            padding: 6px 8px;
             cursor: pointer;
             text-align: center;
             box-shadow: 0 4px 14px rgba(0,0,0,0.5);
@@ -350,7 +339,7 @@
 
         .status-card-label {
             display: block;
-            font-size: 10px;
+            font-size: 9.5px;
             font-weight: 800;
             text-transform: uppercase;
             color: #94a3b8;
@@ -359,7 +348,7 @@
 
         .status-card-count {
             display: block;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 900;
             color: #ffffff;
             margin-top: 2px;
@@ -369,7 +358,7 @@
 
         .status-dropdown-container {
             position: relative;
-            width: 100%;
+            width: 220px;
         }
 
         .status-dropdown-list {
@@ -432,7 +421,7 @@
         /* Navigation / 3D Controls Container */
         .ge-nav-widget {
             position: absolute;
-            top: 20px;
+            top: 15px;
             right: 70px;
             z-index: 2001;
             display: flex;
@@ -443,9 +432,9 @@
         }
 
         .compass-ring {
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
+            width: 34px;
+            height: 34px;
+            border-radius: 4px;
             border: 2px solid rgba(0, 0, 0, 0.2);
             background: #ffffff;
             position: relative;
@@ -457,13 +446,13 @@
         .compass-ring:active { cursor: grabbing; }
 
         .compass-inner {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
             border: 1px dashed rgba(0, 0, 0, 0.4);
             position: absolute;
-            top: 8px;
-            left: 8px;
+            top: 7px;
+            left: 7px;
             pointer-events: none;
         }
 
@@ -699,18 +688,28 @@
         <!-- Top Left Controls: Feeder Search Bar, Electric Poles Widget & Status Bar -->
         <div class="top-left-controls">
             <div class="top-left-row">
+                <!-- Collapsible Feeder Search Icon & Input -->
                 <div class="feeder-search-container">
-                    <div class="search-input-wrapper">
-                        <input type="text" id="feederSearchInput" placeholder="🔍 Search Feeder" autocomplete="off" />
+                    <div class="custom-control-btn" id="searchToggleIconBtn" title="Search Feeder">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </div>
+                    <div class="search-input-wrapper" id="searchInputWrapper">
+                        <input type="text" id="feederSearchInput" placeholder="🔍 Search Feeder..." autocomplete="off" />
                         <button class="clear-search-btn" id="clearSearchBtn" title="Clear search">✕</button>
                     </div>
                     <div class="search-results-dropdown" id="searchResultsDropdown"></div>
                 </div>
 
+                <!-- Collapsible Electric Poles Icon & Menu -->
                 <div class="poles-widget-container">
-                    <div class="poles-toggle-wrapper" id="polesToggleBtn" title="Toggle Electric Poles Menu">
-                        <span>📍 Poles</span>
-                        <span id="polesToggleArrow" style="font-size:10px;">▼</span>
+                    <div class="custom-control-btn" id="polesToggleIconBtn" title="Toggle Electric Poles Menu">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
                     </div>
                     <div class="custom-poles-dropdown" id="customPolesDropdown">
                         <div class="poles-dropdown-title">Electric Poles</div>
@@ -2112,9 +2111,28 @@
             currentActiveStatusTab = null;
         });
 
+        // Search Toggle logic
+        const searchToggleIconBtn = document.getElementById('searchToggleIconBtn');
+        const searchInputWrapper = document.getElementById('searchInputWrapper');
         const searchInput = document.getElementById('feederSearchInput');
         const clearBtn = document.getElementById('clearSearchBtn');
         const searchDropdown = document.getElementById('searchResultsDropdown');
+
+        searchToggleIconBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isOpen = searchInputWrapper.classList.contains('active');
+            if (isOpen) {
+                searchInputWrapper.classList.remove('active');
+                searchDropdown.style.display = 'none';
+                searchToggleIconBtn.classList.remove('active');
+            } else {
+                searchInputWrapper.classList.add('active');
+                searchToggleIconBtn.classList.add('active');
+                document.getElementById('customPolesDropdown').classList.remove('active');
+                document.getElementById('polesToggleIconBtn').classList.remove('active');
+                searchInput.focus();
+            }
+        });
 
         searchInput.addEventListener('input', function() {
             const val = this.value.trim().toUpperCase().replace(/\s+/g, "").replace(/_/g, "-");
@@ -2218,28 +2236,31 @@
             poleSearchResultsDropdown.style.display = 'none';
         });
 
-        const polesToggleBtn = document.getElementById('polesToggleBtn');
+        const polesToggleIconBtn = document.getElementById('polesToggleIconBtn');
         const customPolesDropdown = document.getElementById('customPolesDropdown');
-        const polesToggleArrow = document.getElementById('polesToggleArrow');
 
-        polesToggleBtn.addEventListener('click', function(e) {
+        polesToggleIconBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             const isOpen = customPolesDropdown.classList.contains('active');
             if (isOpen) {
                 customPolesDropdown.classList.remove('active');
-                polesToggleArrow.textContent = '▼';
+                polesToggleIconBtn.classList.remove('active');
             } else {
                 customPolesDropdown.classList.add('active');
-                polesToggleArrow.textContent = '▲';
+                polesToggleIconBtn.classList.add('active');
+                searchInputWrapper.classList.remove('active');
+                searchToggleIconBtn.classList.remove('active');
                 searchDropdown.style.display = 'none';
             }
         });
 
         document.addEventListener('click', function(e) {
-            if (!e.target.closest('.feeder-search-container')) searchDropdown.style.display = 'none';
+            if (!e.target.closest('.feeder-search-container')) {
+                searchDropdown.style.display = 'none';
+            }
             if (!e.target.closest('.poles-widget-container')) {
                 customPolesDropdown.classList.remove('active');
-                polesToggleArrow.textContent = '▼';
+                polesToggleIconBtn.classList.remove('active');
             }
             if (!e.target.closest('.status-dropdown-container')) {
                 document.getElementById('statusDropdownList').classList.remove('active');
@@ -2252,9 +2273,11 @@
                 resetFeederGroupSelection();
                 reset33kvSelection();
                 searchDropdown.style.display = 'none';
+                searchInputWrapper.classList.remove('active');
+                searchToggleIconBtn.classList.remove('active');
                 poleSearchResultsDropdown.style.display = 'none';
                 customPolesDropdown.classList.remove('active');
-                polesToggleArrow.textContent = '▼';
+                polesToggleIconBtn.classList.remove('active');
                 document.getElementById('statusDropdownList').classList.remove('active');
                 currentActiveStatusTab = null;
             }
