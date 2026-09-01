@@ -386,8 +386,8 @@ function renderCards() {
 
                     let feederPowerHtml = "";
                     if (isSubOnline && fb.power && typeof fb.power === "object") {
-                        const fV  = Number(fb.power.V ?? 0).toFixed(1);
-                        const fI  = Number(fb.power.I ?? 0).toFixed(1);
+                        const fV  = Number(fb.power.V ?? 0).toFixed(2);
+                        const fI  = Number(fb.power.I ?? 0).toFixed(2);
                         const fP  = Number(fb.power.P ?? 0).toFixed(2);
                         const fPF = Number(fb.power.PF ?? 0).toFixed(2);
                         
