@@ -40,6 +40,17 @@
         .pwr-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:5px; }
         .pwr-header { font-weight:700; color:#0d47a1; font-size:10px; text-align:left; margin-bottom:3px; }
         .footer{ text-align:center; margin-top:30px; font-size:13px; padding-bottom: 20px; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background-color: #fff; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .modal-title { font-size: 16px; font-weight: bold; color: #0d47a1; }
+        .close-btn { cursor: pointer; font-size: 20px; font-weight: bold; color: #888; }
+        .modal-list { list-style: none; padding: 0; margin: 0; }
+        .modal-list li { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; display: flex; justify-content: space-between; }
+        .clickable-metric { cursor: pointer; text-decoration: underline; }
+        .clickable-metric:hover { color: #c62828; }
     </style>
 </head>
 <body>
@@ -61,12 +72,24 @@
 </div>
 <div id="container"></div>
 
+<!-- Popup Modal -->
+<div id="feederModal" class="modal" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div id="modalTitle" class="modal-title">List</div>
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+        </div>
+        <ul id="modalList" class="modal-list"></ul>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
 const FIREBASE_URL = "https://allpbs-f3b0c-default-rtdb.asia-southeast1.firebasedatabase.app";
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec";    
 
 let firebaseData = {}; let sheetTripData = []; let cardMap = {}; let isInitialLoad = true; let isFetching = false;
+let globalOffFeeders = {}; let globalOfflineFeeders = {};
 
 function formatDisplayTime(t) {      
     if (!t || t === "--") return "--";      
@@ -182,14 +205,22 @@ function renderCards() {
     const TIMEOUT_MS = 100000;      
     const faults = window.allFaults || [];
 
+    globalOffFeeders = {};
+    globalOfflineFeeders = {};
+
     for (let pbs in firebaseData) {            
         if (pbsFilter !== "ALL" && pbs !== pbsFilter) continue;                            
         let pbsOnCount = 0;
+        let pbsOffCount = 0;
+        let pbsOfflineFeederCount = 0;
         let pbsOnlineFeederTotal = 0;
         let pbsGrandFeederTotal = 0;            
         let pbsOnlineSubs = 0;            
         let pbsTotalPowerMW = 0.0;        
         let pbsTotalSubs = Object.keys(firebaseData[pbs] || {}).length;
+
+        globalOffFeeders[pbs] = [];
+        globalOfflineFeeders[pbs] = [];
 
         for (let sub in firebaseData[pbs]) {                  
             let isSubOnline = false;                  
@@ -198,20 +229,23 @@ function renderCards() {
                 if ((now - hb) < TIMEOUT_MS) isSubOnline = true;                  
             }
 
-            // Loop through all devices/relays to compute totals
             for (let dev in firebaseData[pbs][sub]) {
                 for (let relay in firebaseData[pbs][sub][dev]) {
                     if (["power", "deviceStatus", "lastHeartbeat"].includes(relay)) continue;
                     
-                    // Grand total includes every relay/feeder in all substations
                     pbsGrandFeederTotal++;
 
                     if (isSubOnline) {
-                        // Online total includes relays/feeders in online substations only
                         pbsOnlineFeederTotal++;
                         if (firebaseData[pbs][sub][dev][relay].status === "ON") {
                             pbsOnCount++;
+                        } else {
+                            pbsOffCount++;
+                            globalOffFeeders[pbs].push({ sub, relay });
                         }
+                    } else {
+                        pbsOfflineFeederCount++;
+                        globalOfflineFeeders[pbs].push({ sub, relay });
                     }
                 }
             }
@@ -243,9 +277,11 @@ function renderCards() {
         const pbsHeader = document.createElement("div");            
         pbsHeader.innerHTML = `<div style="background:#e3f2fd; padding:12px; margin-top:20px; border-radius:12px; border-left:5px solid #2d9cff;">                    
             <h2 style="margin:0; font-size:18px;">${pbs} Summary</h2>                    
-            <div style="margin-top:5px; font-size:14px;">                            
+            <div style="margin-top:5px; font-size:14px; line-height:1.6;">                            
                 Substations Online: <b>${pbsOnlineSubs} / ${pbsTotalSubs}</b><br>                            
                 Feeders ON: <b>${pbsOnCount} / ${pbsOnlineFeederTotal}</b> <span style="color:#777; font-size:12px; font-weight:normal;">(Total: ${pbsGrandFeederTotal})</span><br>                
+                Feeders OFF: <b class="clickable-metric" style="color:#c62828;" onclick="showModal('${pbs}', 'OFF')">${pbsOffCount}</b><br>
+                Feeders Offline: <b class="clickable-metric" style="color:#e65100;" onclick="showModal('${pbs}', 'OFFLINE')">${pbsOfflineFeederCount}</b><br>
                 Total Power: <b style="color:#0d47a1;">${pbsTotalPowerMW.toFixed(2)} MW</b>            
             </div></div>`;            
         container.appendChild(pbsHeader);
@@ -307,6 +343,7 @@ function renderCards() {
             let powerDisplayHtml = "";            
             if (isSubOnline) {                
                 if (hasPZEM2) {                    
+                    const subTotalP = (subP1 + subP2).toFixed(2);
                     powerDisplayHtml = `                    
                     <div class="pwr-box">                        
                         <div class="pwr-header">Unit-1</div>                        
@@ -325,6 +362,9 @@ function renderCards() {
                             <div><b style="color:#555;">PF:</b> ${(count2 ? (subPF2/count2).toFixed(2) : "0.00")}</div>                            
                             <div><b style="color:#555;">F:</b> ${(count2 ? (subF2/count2).toFixed(2) : "0.00")}Hz</div>                        
                         </div>                    
+                        <div style="margin-top:6px; padding-top:4px; border-top:1px dashed #ccc; text-align:center; font-weight:bold; color:#0d47a1; font-size:12px;">
+                            Total Power: ${subTotalP} MW
+                        </div>
                     </div>`;                
                 } else {                    
                     powerDisplayHtml = `                    
@@ -451,6 +491,34 @@ function renderCards() {
         }      
     }      
     container.innerHTML += '<div class="footer"><b>Developed by: Shanta Saha</b><br>AGM (O&amp;M)<br>Naogaon PBS-1</div>';
+}
+
+function showModal(pbs, type) {
+    const modal = document.getElementById("feederModal");
+    const title = document.getElementById("modalTitle");
+    const list = document.getElementById("modalList");
+    
+    list.innerHTML = "";
+    const items = (type === "OFF") ? globalOffFeeders[pbs] : globalOfflineFeeders[pbs];
+    
+    title.innerText = `${pbs} - Feeders ${type} (${items ? items.length : 0})`;
+
+    if (!items || items.length === 0) {
+        list.innerHTML = '<li style="justify-content:center; color:#888;">No feeders found.</li>';
+    } else {
+        items.forEach(item => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span><b>${item.sub}</b></span> <span style="color:#c62828; font-weight:bold;">${item.relay.toUpperCase()}</span>`;
+            list.appendChild(li);
+        });
+    }
+
+    modal.style.display = "flex";
+}
+
+function closeModal(event) {
+    const modal = document.getElementById("feederModal");
+    modal.style.display = "none";
 }
 
 function onFilterChange() {        
