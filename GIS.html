@@ -703,14 +703,31 @@
                     <div class="search-results-dropdown" id="searchResultsDropdown"></div>
                 </div>
 
-                <!-- Collapsible Electric Poles Icon & Menu -->
-                <div class="poles-widget-container">
-                    <div class="custom-control-btn" id="polesToggleIconBtn" title="Toggle Electric Poles Menu">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                            <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
-                    </div>
+<!-- Collapsible Electric Poles Icon & Menu -->
+<div class="poles-widget-container">
+    <div class="custom-control-btn" id="polesToggleIconBtn" title="Toggle Electric Poles Menu">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Drop Shadow Filter for Badge -->
+            <defs>
+                <filter id="badgeShadow" x="12" y="0" width="16" height="16" filterUnits="userSpaceOnUse">
+                    <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000000" flood-opacity="0.25"/>
+                </filter>
+            </defs>
+
+            <!-- Main Location Pin Icon -->
+            <path d="M22 13c0 7-8 13-8 13s-8-6-8-13a8 8 0 0 1 16 0z" stroke="#1e293b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <circle cx="14" cy="13" r="3" stroke="#1e293b" stroke-width="1.8" stroke-dasharray="2 2"></circle>
+            
+            <!-- Upgraded Badge with Outer Border, Shadow, and Precise Typography -->
+            <g filter="url(#badgeShadow)">
+                <!-- Blue Background Box with Crisp White Border -->
+                <rect x="15" y="1" width="12" height="12" rx="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="1.5"></rect>
+                
+                <!-- Bold, Clean Centered 'P' -->
+                <text x="21" y="7" fill="#ffffff" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="800" text-anchor="middle" dominant-baseline="central">P</text>
+            </g>
+        </svg>
+    </div>
                     <div class="custom-poles-dropdown" id="customPolesDropdown">
                         <div class="poles-dropdown-title">Electric Poles</div>
                         
