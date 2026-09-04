@@ -107,6 +107,20 @@ function toggleDetails(id) {
     if(el) el.style.display = (el.style.display === "block") ? "none" : "block";
 }
 
+function handleTypeChange(id) {
+    const typeEl = document.getElementById("type_" + id);
+    const inputEl = document.getElementById("input_" + id);
+    if (!typeEl || !inputEl) return;
+
+    if (typeEl.value === "LS") {
+        inputEl.value = "Loadshedding";
+    } else {
+        if (inputEl.value === "Loadshedding") {
+            inputEl.value = "";
+        }
+    }
+}
+
 async function fetchWithRetry(url, options = {}, retries = 2, delay = 1000) {      
     try {            
         return await axios.get(url, options);      
@@ -456,7 +470,6 @@ function renderCards() {
 
                     let faultBoxHtml = "";                              
                     if (!isStatusOn) { 
-                        // Parse multiline string into individual log items
                         const logs = faultReason ? faultReason.split("\n").filter(Boolean) : [];
                         const historyHtml = logs.map(log => 
                             `<div style="font-size:11px; margin-bottom:3px; border-bottom:1px dashed #cce3f7; padding-bottom:2px; color:#1a237e;">• ${log}</div>`
@@ -467,14 +480,14 @@ function renderCards() {
                                 ${logs.length > 0 ? `<div style="font-weight:700; color:#0d47a1; font-size:11px; margin-bottom:4px;">Log History:</div><div style="max-height:70px; overflow-y:auto; margin-bottom:6px;">${historyHtml}</div>` : ''}
                                 
                                 <div style="display:flex; flex-direction:column; gap:4px;">
-                                    <select id="type_${id}" style="padding:4px; font-size:11px; border-radius:4px; border:1px solid #ccc;">
+                                    <select id="type_${id}" onchange="handleTypeChange('${id}')" style="padding:4px; font-size:11px; border-radius:4px; border:1px solid #ccc;">
                                         <option value="Fault">Fault Reason</option>
                                         <option value="Shutdown">Shutdown / Maintenance</option>
                                         <option value="LS">Load shedding</option>
-                                        <option value="Update">Status Update</option>
+                                        <option value="Others">Others</option>
                                     </select>
                                     <input type="text" id="input_${id}" placeholder="Enter details..." style="margin-bottom:2px; font-size:12px;">                                                       
-                                    <button class="smallBtn" onclick="saveFault('${id}')">Save</button>                                                
+                                    <button class="smallBtn" onclick="saveFault('${id}')">Add Entry</button>                                                
                                 </div>
                             </div>`;                                    
                     }
