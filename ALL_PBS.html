@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,7 +50,7 @@
         .modal-list { list-style: none; padding: 0; margin: 0; }
         .modal-list li { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
         .modal-item-header { display: flex; justify-content: space-between; align-items: center; }
-        .modal-reason { font-size: 12px; color: #c62828; font-style: italic; background: #fff5f5; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #c62828; }
+        .modal-reason { font-size: 12px; color: #c62828; font-style: italic; background: #fff5f5; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #c62828; word-break: break-word; }
         .clickable-metric { cursor: pointer; text-decoration: underline; }
         .clickable-metric:hover { color: #c62828; }
     </style>
@@ -456,20 +455,27 @@ function renderCards() {
                     const isStatusOn = (fb.status === "ON");
 
                     let faultBoxHtml = "";                              
-                    if (!isStatusOn) {                                    
-                        if (faultReason) {                                          
-                            faultBoxHtml = `                                                
-                                <div class="faultBox" style="display:block" onclick="event.stopPropagation()">                                                       
-                                    <div style="font-weight:700; color:#0d47a1;">Fault Reason:</div>                                                       
-                                    <div style="margin-top:4px; font-size:13px;">${faultReason}</div>                                                
-                                </div>`;                                    
-                        } else if (isSubOnline && fb.status === "OFF") {                                          
-                            faultBoxHtml = `                                                
-                                <div class="faultBox" id="fault_${id}" style="display:block" onclick="event.stopPropagation()">                                                       
-                                    <input type="text" id="input_${id}" placeholder="Enter Fault Reason">                                                       
-                                    <button class="smallBtn" onclick="saveFault('${id}')">Save</button>                                                
-                                </div>`;                                    
-                        }                              
+                    if (!isStatusOn) { 
+                        // Parse multiline string into individual log items
+                        const logs = faultReason ? faultReason.split("\n").filter(Boolean) : [];
+                        const historyHtml = logs.map(log => 
+                            `<div style="font-size:11px; margin-bottom:3px; border-bottom:1px dashed #cce3f7; padding-bottom:2px; color:#1a237e;">• ${log}</div>`
+                        ).join("");
+
+                        faultBoxHtml = `                                                
+                            <div class="faultBox" id="fault_${id}" style="display:block" onclick="event.stopPropagation()">                                                       
+                                ${logs.length > 0 ? `<div style="font-weight:700; color:#0d47a1; font-size:11px; margin-bottom:4px;">Log History:</div><div style="max-height:70px; overflow-y:auto; margin-bottom:6px;">${historyHtml}</div>` : ''}
+                                
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    <select id="type_${id}" style="padding:4px; font-size:11px; border-radius:4px; border:1px solid #ccc;">
+                                        <option value="Fault">Fault Reason</option>
+                                        <option value="Shutdown">Shutdown / Maintenance</option>
+                                        <option value="Update">Status Update</option>
+                                    </select>
+                                    <input type="text" id="input_${id}" placeholder="Enter details..." style="margin-bottom:2px; font-size:12px;">                                                       
+                                    <button class="smallBtn" onclick="saveFault('${id}')">Add Entry</button>                                                
+                                </div>
+                            </div>`;                                    
                     }
 
                     grid.innerHTML += `                              
@@ -518,8 +524,10 @@ function showModal(pbs, type) {
                 String(f.relay || f.RELAY || "").trim().toUpperCase() === String(item.relay).trim().toUpperCase()
             );
 
-            const reason = fault?.message || fault?.fault || fault?.faultReason || "";
-            const reasonHtml = reason ? `<div class="modal-reason">Reason: ${reason}</div>` : `<div class="modal-reason" style="color:#888; border-color:#ccc; background:#f9f9f9;">Reason: Not specified</div>`;
+            const rawReason = fault?.message || fault?.fault || fault?.faultReason || "";
+            const formattedReason = rawReason ? rawReason.replace(/\n/g, "<br>") : "";
+            
+            const reasonHtml = formattedReason ? `<div class="modal-reason"><b>Log:</b><br>${formattedReason}</div>` : `<div class="modal-reason" style="color:#888; border-color:#ccc; background:#f9f9f9;">Reason: Not specified</div>`;
 
             const li = document.createElement("li");
             li.innerHTML = `
@@ -548,16 +556,23 @@ function onFilterChange() {
 
 async function saveFault(id) {      
     const inputEl = document.getElementById("input_" + id);      
-    if(!inputEl) return;      
+    const typeEl = document.getElementById("type_" + id);
+    if (!inputEl) return;      
+
     const reason = inputEl.value.trim();      
-    if(!reason) return alert("Enter fault reason");      
+    const type = typeEl ? typeEl.value : "Note";
+    if (!reason) return alert("Enter details first");      
+
+    const formattedMessage = `${type}: ${reason}`;
     const obj = cardMap[id];      
+
     try {            
-        const postUrl = `${SCRIPT_URL}?pbs=${encodeURIComponent(obj.pbs)}&sub=${encodeURIComponent(obj.sub)}&dev=${encodeURIComponent(obj.dev)}&relay=${encodeURIComponent(obj.relay)}&message=${encodeURIComponent(reason)}`;            
+        const postUrl = `${SCRIPT_URL}?pbs=${encodeURIComponent(obj.pbs)}&sub=${encodeURIComponent(obj.sub)}&dev=${encodeURIComponent(obj.dev)}&relay=${encodeURIComponent(obj.relay)}&message=${encodeURIComponent(formattedMessage)}`;            
         await fetch(postUrl, { method: "POST", mode: "no-cors" });            
+        inputEl.value = "";
         setTimeout(loadAppsScriptData, 1000);      
     } catch (e) {            
-        alert("Failed to save fault reason. Please try again.");      
+        alert("Failed to save entry. Please try again.");      
     }
 }
 
