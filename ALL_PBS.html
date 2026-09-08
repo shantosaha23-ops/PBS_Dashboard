@@ -571,6 +571,7 @@ function onFilterChange() {
 async function saveFault(id) {      
     const inputEl = document.getElementById("input_" + id);      
     const typeEl = document.getElementById("type_" + id);
+    const faultBox = document.getElementById("fault_" + id);
     if (!inputEl) return;      
 
     const reason = inputEl.value.trim();      
@@ -580,13 +581,76 @@ async function saveFault(id) {
     const formattedMessage = `${type}: ${reason}`;
     const obj = cardMap[id];      
 
+    // 1. Get the save button inside the card & set loading state
+    const btn = faultBox ? faultBox.querySelector(".smallBtn") : null;
+    let originalBtnText = "Save";
+    if (btn) {
+        originalBtnText = btn.innerText;
+        btn.innerText = "⏳ Saving...";
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+        btn.style.cursor = "not-allowed";
+    }
+
     try {            
         const postUrl = `${SCRIPT_URL}?pbs=${encodeURIComponent(obj.pbs)}&sub=${encodeURIComponent(obj.sub)}&dev=${encodeURIComponent(obj.dev)}&relay=${encodeURIComponent(obj.relay)}&message=${encodeURIComponent(formattedMessage)}`;            
+        
+        // Send request to Google Apps Script
         await fetch(postUrl, { method: "POST", mode: "no-cors" });            
+        
+        // 2. Optimistically update local data array so the UI updates immediately
+        const timestamp = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const formattedTime = `${timestamp.getFullYear()}-${pad(timestamp.getMonth() + 1)}-${pad(timestamp.getDate())} ${pad(timestamp.getHours())}:${pad(timestamp.getMinutes())}`;
+        const newLogEntry = `[${formattedTime}] ${formattedMessage}`;
+
+        if (!window.allFaults) window.allFaults = [];
+        let existingFault = window.allFaults.find(f => 
+            String(f.pbs || f.PBS || "").trim().toUpperCase() === String(obj.pbs).trim().toUpperCase() &&
+            String(f.sub || f.SUB || "").trim().toUpperCase() === String(obj.sub).trim().toUpperCase() &&
+            String(f.dev || f.DEV || "").trim().toUpperCase() === String(obj.dev).trim().toUpperCase() &&
+            String(f.relay || f.RELAY || "").trim().toUpperCase() === String(obj.relay).trim().toUpperCase()
+        );
+
+        if (existingFault) {
+            existingFault.fault = existingFault.fault ? existingFault.fault + "\n" + newLogEntry : newLogEntry;
+        } else {
+            window.allFaults.push({
+                pbs: obj.pbs,
+                sub: obj.sub,
+                dev: obj.dev,
+                relay: obj.relay,
+                fault: newLogEntry
+            });
+        }
+
+        // 3. Clear input & show instant success feedback on button
         inputEl.value = "";
-        setTimeout(loadAppsScriptData, 1000);      
+        if (btn) {
+            btn.innerText = "✔ Saved!";
+            btn.style.backgroundColor = "#2ecc71";
+            
+            // Reset button back to normal state after 2 seconds
+            setTimeout(() => {
+                btn.innerText = originalBtnText;
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+                btn.style.backgroundColor = "#2d9cff";
+            }, 2000);
+        }
+
+        // 4. Instantly re-render cards to display the new entry in the log history list
+        renderCards();
+
     } catch (e) {            
         alert("Failed to save entry. Please try again.");      
+        if (btn) {
+            btn.innerText = originalBtnText;
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.style.cursor = "pointer";
+        }
     }
 }
 
