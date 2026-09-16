@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PBS Multi Substation Summary Dashboard</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            --bg-body: #f4f6f9;
+            --surface: #ffffff;
+            --surface-subtle: #f8fafc;
+            --border: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --primary-light: #e0f2fe;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --danger: #ef4444;
+            --danger-light: #fee2e2;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px -2px rgba(0,0,0,0.08);
+            --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Styling */
+        .top-navbar {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 16px 24px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .pbs-logo {
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, #0b2545, #134074);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(11, 37, 69, 0.3);
+            border: 2px solid #38bdf8;
+            flex-shrink: 0;
+        }
+
+        .brand-title h1 {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.02em;
+        }
+
+        .brand-title p {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .select-wrapper {
+            position: relative;
+            min-width: 220px;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+            background-color: var(--surface-subtle);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            outline: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        select:focus {
+            border-color: var(--primary);
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+        }
+
+        .btn-action {
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+        }
+
+        .btn-refresh {
+            background-color: var(--surface-subtle);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+        }
+
+        .btn-refresh:hover {
+            background-color: #e2e8f0;
+        }
+
+        .btn-details {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: white;
+            box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3);
+        }
+
+        .btn-details:hover {
+            background: linear-gradient(135deg, #0369a1, #075985);
+            transform: translateY(-1px);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            background: #f1f5f9;
+            color: var(--text-muted);
+        }
+
+        .status-badge.online {
+            background: var(--success-light);
+            color: #065f46;
+        }
+
+        .status-badge.retrying {
+            background: var(--danger-light);
+            color: #991b1b;
+        }
+
+        .status-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        .online .status-pulse {
+            animation: pulse-green 1.5s infinite;
+        }
+
+        @keyframes pulse-green {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .summary-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-grow: 1;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        /* KPI Dashboard Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 18px;
+        }
+
+        .kpi-card {
+            background: var(--surface);
+            border-radius: var(--radius-md);
+            padding: 24px 20px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .kpi-card.hero-card {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: white;
+            border: none;
+        }
+
+        .kpi-card.hero-card .kpi-info p {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .kpi-card.hero-card .kpi-info h3 {
+            color: #ffffff;
+            font-size: 26px;
+        }
+
+        .kpi-card.hero-card .kpi-info .sub-text {
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.15);
+            padding: 3px 8px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        .kpi-info p {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .kpi-info h3 {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-top: 6px;
+            line-height: 1.1;
+        }
+
+        .kpi-info .sub-text {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .kpi-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .kpi-blue { background: var(--primary-light); color: var(--primary); }
+        .kpi-green { background: var(--success-light); color: var(--success); }
+        .kpi-amber { background: var(--warning-light); color: var(--warning); }
+        .kpi-red { background: var(--danger-light); color: var(--danger); }
+        .kpi-hero-icon { background: rgba(255, 255, 255, 0.2); color: #ffffff; }
+
+        .clickable-card { cursor: pointer; }
+        .clickable-card:hover { border-color: var(--primary); }
+
+        .progress-card {
+            background: var(--surface);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .progress-bar-bg {
+            height: 10px;
+            width: 100%;
+            background: var(--surface-subtle);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        .select-prompt {
+            text-align: center;
+            padding: 80px 20px;
+            background: var(--surface);
+            border-radius: var(--radius-md);
+            border: 1px dashed var(--border);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background-color: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .modal-content {
+            background-color: var(--surface);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 760px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            animation: modalSlide 0.2s ease-out;
+        }
+
+        @keyframes modalSlide {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface-subtle);
+        }
+
+        .modal-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover { background: var(--border); }
+
+        .modal-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .telemetry-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .telemetry-table th, .telemetry-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .telemetry-table th {
+            background-color: var(--surface-subtle);
+            color: var(--primary-dark);
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .unit-badge {
+            font-size: 10px;
+            background: #e2e8f0;
+            color: var(--text-main);
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .modal-item {
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            background: var(--surface-subtle);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .modal-item-title {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .modal-reason-box {
+            font-size: 12px;
+            color: #991b1b;
+            background: var(--danger-light);
+            padding: 8px 10px;
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--danger);
+        }
+
+        .footer {
+            margin-top: auto;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="top-navbar">
+        <div class="brand-container">
+            <div class="pbs-logo" title="PBS Logo Emblem">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+            </div>
+            <div class="brand-title">
+                <h1>PBS Multi Substation Summary Dashboard</h1>
+                <p>Naogaon Palli Bidyut Samity-1 | Real-time System Overview</p>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <div class="select-wrapper">
+                <select id="pbsFilter" onchange="onFilterChange()">
+                    <option value="SELECT">-- Select PBS --</option>
+                </select>
+            </div>
+
+            <button class="btn-action btn-details" onclick="openDetailsPage()">
+                <i data-lucide="layout-grid" style="width:16px; height:16px;"></i> Details
+            </button>
+
+            <button class="btn-action btn-refresh" onclick="refreshDashboard()">
+                <i data-lucide="refresh-cw" style="width:15px; height:15px;"></i> Refresh
+            </button>
+
+            <div id="onlineStatus" class="status-badge">
+                <span class="status-pulse"></span>
+                <span>Connecting...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="summary-wrapper">
+        <div class="section-title">
+            <i data-lucide="pie-chart" style="color:var(--primary);"></i> Executive Summary Statistics
+        </div>
+
+        <div id="contentView">
+            <div class="select-prompt">
+                <i data-lucide="mouse-pointer-click" style="width:40px; height:40px; color:var(--text-muted); margin-bottom:12px;"></i>
+                <h3 style="font-size:16px; color:var(--text-main);">Please Select a PBS Unit</h3>
+                <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Choose a Palli Bidyut Samity from the dropdown menu above to display real-time metrics.</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="infoModal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div id="modalTitle" class="modal-title">
+                    <i data-lucide="list-filter" style="color:var(--primary);"></i> Breakdown Details
+                </div>
+                <button class="close-btn" onclick="closeModal()">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div id="modalList" class="modal-body"></div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p><strong>Developed by: Shanta Saha</strong> | AGM (O&M), Naogaon PBS-1</p>
+        <p>Palli Bidyut Samity Multi-Substation Automated Live Summary System</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        const FIREBASE_URL = "https://allpbs-f3b0c-default-rtdb.asia-southeast1.firebasedatabase.app";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbww1DL8cnIrcxyZ4gzOtDd1n94sHyIlM3d5XDmt3QHrvEb8zVtHkoqzaVKzJCyFYjf4iw/exec";    
+
+        let firebaseData = {}; 
+        let sheetTripData = []; 
+        let isInitialLoad = true; 
+        let isFetching = false;
+        let globalOffFeeders = {}; 
+        let globalOfflineFeeders = {};
+        let globalSubstationPowerData = {};
+
+        function openDetailsPage() {
+            window.location.href = 'ALL_PBS.html';
+        }
+
+        async function fetchWithRetry(url, options = {}, retries = 2, delay = 1000) {      
+            try {            
+                return await axios.get(url, options);      
+            } catch (err) {            
+                if (retries <= 0) throw err;            
+                await new Promise(res => setTimeout(res, delay));            
+                return fetchWithRetry(url, options, retries - 1, delay * 1.5);      
+            }
+        }
+
+        async function loadRealtimeFirebase() {        
+            const statusEl = document.getElementById("onlineStatus");        
+            statusEl.className = "status-badge";
+            statusEl.innerHTML = `<span class="status-pulse"></span><span>Loading Live...</span>`;
+
+            try {                
+                const fbRes = await fetchWithRetry(FIREBASE_URL + "/.json", { timeout: 8000 });                
+                firebaseData = fbRes.data || {};
+
+                if (isInitialLoad) {                        
+                    buildFilters();                        
+                    isInitialLoad = false;                
+                }
+
+                renderSummary();        
+                statusEl.className = "status-badge online";
+                statusEl.innerHTML = `<span class="status-pulse"></span><span>ONLINE (Live)</span>`;
+            } catch (err) {                
+                console.error("Firebase load error:", err);                
+                statusEl.className = "status-badge retrying";
+                statusEl.innerHTML = `<span class="status-pulse"></span><span>RETRYING...</span>`;
+            }
+        }
+
+        async function loadAppsScriptData() {        
+            try {                
+                const gasRes = await fetchWithRetry(SCRIPT_URL + "?mode=allData", { timeout: 20000 });                
+                sheetTripData = gasRes.data?.trip || [];                
+                window.allFaults = gasRes.data?.fault || [];
+                renderSummary();        
+            } catch (err) {                
+                console.warn("Apps Script fetch delayed:", err);        
+            }
+        }
+
+        async function loadAll() {        
+            if (isFetching) return;        
+            isFetching = true;
+            await loadRealtimeFirebase();        
+            isFetching = false;
+            setTimeout(() => { loadAppsScriptData(); }, 1500);
+        }
+
+        function buildFilters() {        
+            const pbsFilter = document.getElementById("pbsFilter");        
+            const currentPbs = pbsFilter.value;        
+            const pbsList = Object.keys(firebaseData);
+
+            pbsFilter.innerHTML = '<option value="SELECT">-- Select PBS --</option>' +                  
+                pbsList.map(v => `<option value="${v}" ${v === currentPbs ? 'selected' : ''}>${v}</option>`).join('');                    
+            
+            if (currentPbs === "SELECT" && pbsList.length > 0) {
+                pbsFilter.value = pbsList[0];
+            }
+        }
+
+        function renderSummary() {      
+            const container = document.getElementById("contentView");      
+            const selectedPbs = document.getElementById("pbsFilter").value;
+
+            if (selectedPbs === "SELECT") {              
+                container.innerHTML = `
+                    <div class="select-prompt">
+                        <i data-lucide="mouse-pointer-click" style="width:40px; height:40px; color:var(--text-muted); margin-bottom:12px;"></i>
+                        <h3 style="font-size:16px; color:var(--text-main);">Please Select a PBS Unit</h3>
+                        <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Choose a Palli Bidyut Samity from the dropdown menu above to display real-time metrics.</p>
+                    </div>`;              
+                lucide.createIcons();
+                return;      
+            }              
+
+            const now = Date.now();      
+            const TIMEOUT_MS = 100000;
+
+            let totalSubsCount = Object.keys(firebaseData[selectedPbs] || {}).length;
+            let onlineSubsCount = 0;
+
+            let totalFeedersOn = 0;
+            let totalFeedersOff = 0;
+            let totalFeedersOffline = 0;
+            let grandFeederTotal = 0;
+
+            let totalPowerSupplyMW = 0.0;
+            let totalPowerDemandMW = 0.0;
+
+            globalOffFeeders[selectedPbs] = [];
+            globalOfflineFeeders[selectedPbs] = [];
+            globalSubstationPowerData[selectedPbs] = [];
+
+            for (let sub in firebaseData[selectedPbs]) {                  
+                let isSubOnline = false;                  
+
+                for (let dev in firebaseData[selectedPbs][sub]) {                        
+                    const hb = (firebaseData[selectedPbs][sub][dev].lastHeartbeat || 0) * 1000;                        
+                    if ((now - hb) < TIMEOUT_MS) isSubOnline = true;                  
+                }
+
+                if (isSubOnline) {
+                    onlineSubsCount++;
+
+                    let subSupplyMW = 0;
+                    let subFeedersOn = 0;
+                    let subFeedersOff = 0;
+
+                    let subV1=0, subI1=0, subP1=0, subPF1=0, subF1=0, count1=0;
+                    let subV2=0, subI2=0, subP2=0, subPF2=0, subF2=0, count2=0;
+                    let hasPZEM2 = false;
+                    let feederItems = [];
+
+                    for (let dev in firebaseData[selectedPbs][sub]) {
+                        for (let key in firebaseData[selectedPbs][sub][dev]) {
+                            if (["power", "deviceStatus", "lastHeartbeat"].includes(key)) continue;
+                            
+                            grandFeederTotal++;
+                            const feeder = firebaseData[selectedPbs][sub][dev][key];
+
+                            if (feeder.status === "ON") {
+                                subFeedersOn++;
+                                totalFeedersOn++;
+                            } else {
+                                subFeedersOff++;
+                                totalFeedersOff++;
+                                globalOffFeeders[selectedPbs].push({ sub, dev, relay: key });
+                            }
+
+                            if (feeder.power && feeder.power.P !== undefined) {
+                                const feederP = Number(feeder.power.P || 0);
+                                const feederI = Number(feeder.power.I || 0);
+                                const feederV = Number(feeder.power.V || 0);
+                                const feederPF = Number(feeder.power.PF || 0);
+                                const feederF = Number(feeder.power.F || 0);
+
+                                subSupplyMW += feederP;
+                                feederItems.push({
+                                    name: key,
+                                    status: feeder.status || "OFF",
+                                    p: feederP.toFixed(2),
+                                    i: feederI.toFixed(2),
+                                    v: feederV.toFixed(2),
+                                    pf: feederPF.toFixed(2),
+                                    f: feederF ? feederF.toFixed(2) : "--"
+                                });
+                            }
+                        }
+
+                        // Root Level Fallback Telemetry Parsing
+                        const pwr = firebaseData[selectedPbs][sub][dev].power || {};
+                        if (pwr && Object.keys(pwr).length > 0) {
+                            const p1 = Number(pwr.P1 ?? pwr.P ?? pwr.p ?? 0);
+                            const p2 = Number(pwr.P2 ?? 0);
+
+                            subV1 += Number(pwr.V1 ?? pwr.V ?? pwr.v ?? 0);                         
+                            subI1 += Number(pwr.I1 ?? pwr.I ?? pwr.c ?? 0);                                      
+                            subP1 += p1;                         
+                            subPF1 += Number(pwr.PF1 ?? pwr.PF ?? pwr.pf ?? 0);                                      
+                            subF1 += Number(pwr.F1 ?? pwr.F ?? pwr.f ?? 0);                         
+                            count1++;
+
+                            if (pwr.V2 !== undefined || pwr.I2 !== undefined || pwr.P2 !== undefined) {                            
+                                hasPZEM2 = true;                            
+                                subV2 += Number(pwr.V2 || 0);                             
+                                subI2 += Number(pwr.I2 || 0);                                          
+                                subP2 += p2;                             
+                                subPF2 += Number(pwr.PF2 || 0);                                          
+                                subF2 += Number(pwr.F2 || 0);                             
+                                count2++;                        
+                            }
+
+                            // If subSupplyMW was not computed from feeders, fall back to root P readings
+                            if (feederItems.length === 0) {
+                                subSupplyMW += (p1 + p2);
+                            }
+                        }
+                    }
+
+                    // --- Per-Substation Demand Calculation ---
+                    let subDemandMW = subSupplyMW;
+                    if (subFeedersOff > 0 && subFeedersOn > 0) {
+                        const avgLoadPerFeeder = subSupplyMW / subFeedersOn;
+                        subDemandMW += (subFeedersOff * avgLoadPerFeeder);
+                    }
+
+                    // Add to Global Totals (Only Online Substations)
+                    totalPowerSupplyMW += subSupplyMW;
+                    totalPowerDemandMW += subDemandMW;
+
+                    globalSubstationPowerData[selectedPbs].push({
+                        sub: sub,
+                        isOnline: true,
+                        hasPZEM2: hasPZEM2,
+                        feeders: feederItems,
+                        unit1: {
+                            v: count1 ? (subV1 / count1).toFixed(2) : "0.00",
+                            i: subI1.toFixed(2),
+                            p: subP1.toFixed(2),
+                            pf: count1 ? (subPF1 / count1).toFixed(2) : "0.00",
+                            f: count1 ? (subF1 / count1).toFixed(2) : "0.00"
+                        },
+                        unit2: hasPZEM2 ? {
+                            v: count2 ? (subV2 / count2).toFixed(2) : "0.00",
+                            i: subI2.toFixed(2),
+                            p: subP2.toFixed(2),
+                            pf: count2 ? (subPF2 / count2).toFixed(2) : "0.00",
+                            f: count2 ? (subF2 / count2).toFixed(2) : "0.00"
+                        } : null,
+                        totalP: subSupplyMW.toFixed(2)
+                    });
+
+                } else {
+                    // Substation Offline: Count feeders, but do NOT sum Power or Demand
+                    for (let dev in firebaseData[selectedPbs][sub]) {
+                        for (let relay in firebaseData[selectedPbs][sub][dev]) {
+                            if (["power", "deviceStatus", "lastHeartbeat"].includes(relay)) continue;
+                            grandFeederTotal++;
+                            totalFeedersOffline++;
+                            globalOfflineFeeders[selectedPbs].push({ sub, dev, relay });
+                        }
+                    }
+
+                    globalSubstationPowerData[selectedPbs].push({
+                        sub: sub,
+                        isOnline: false,
+                        feeders: [],
+                        totalP: "0.00"
+                    });
+                }
+            }
+
+            const feederAvailability = grandFeederTotal > 0 ? ((totalFeedersOn / grandFeederTotal) * 100).toFixed(1) : "0.0";
+
+            container.innerHTML = `
+                <div class="kpi-grid">
+                    <!-- Total Power Supply / Demand Hero Card -->
+                    <div class="kpi-card hero-card clickable-card" onclick="showPowerModal()">
+                        <div class="kpi-info">
+                            <p>Total Power Supply / Demand</p>
+                            <h3>${totalPowerSupplyMW.toFixed(2)} / <span style="color:#fde047;">${totalPowerDemandMW.toFixed(2)}</span> <span style="font-size:18px; font-weight:700;">MW</span></h3>
+                            <div class="sub-text">Click to view per substation breakdown 🔍</div>
+                        </div>
+                        <div class="kpi-icon kpi-hero-icon">
+                            <i data-lucide="zap"></i>
+                        </div>
+                    </div>
+
+                    <!-- Online Substations -->
+                    <div class="kpi-card">
+                        <div class="kpi-info">
+                            <p>Substations Online</p>
+                            <h3>${onlineSubsCount} <span style="font-size:18px; font-weight:600; color:var(--text-muted);">/ ${totalSubsCount}</span></h3>
+                            <div class="sub-text">${totalSubsCount - onlineSubsCount} Substation(s) Offline</div>
+                        </div>
+                        <div class="kpi-icon kpi-blue">
+                            <i data-lucide="building-2"></i>
+                        </div>
+                    </div>
+
+                    <!-- Feeders ON -->
+                    <div class="kpi-card">
+                        <div class="kpi-info">
+                            <p>Feeders Active ON</p>
+                            <h3 style="color:var(--success);">${totalFeedersOn}</h3>
+                            <div class="sub-text">${totalFeedersOn} / ${grandFeederTotal} Feeders Energized</div>
+                        </div>
+                        <div class="kpi-icon kpi-green">
+                            <i data-lucide="check-circle-2"></i>
+                        </div>
+                    </div>
+
+                    <!-- Feeders OFF / Tripped -->
+                    <div class="kpi-card clickable-card" onclick="showModal('${selectedPbs}', 'OFF')">
+                        <div class="kpi-info">
+                            <p>Feeders OFF / Tripped</p>
+                            <h3 style="color:var(--danger);">${totalFeedersOff}</h3>
+                            <div class="sub-text" style="color:var(--danger); font-weight:700;">Click to view log details →</div>
+                        </div>
+                        <div class="kpi-icon kpi-red">
+                            <i data-lucide="alert-octagon"></i>
+                        </div>
+                    </div>
+
+                    <!-- Feeders Offline -->
+                    <div class="kpi-card clickable-card" onclick="showModal('${selectedPbs}', 'OFFLINE')">
+                        <div class="kpi-info">
+                            <p>Feeders Offline</p>
+                            <h3 style="color:var(--warning);">${totalFeedersOffline}</h3>
+                            <div class="sub-text" style="color:var(--warning); font-weight:700;">Click to view list →</div>
+                        </div>
+                        <div class="kpi-icon kpi-amber">
+                            <i data-lucide="wifi-off"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Overall Availability Progress Card -->
+                <div class="progress-card" style="margin-top:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:13px; font-weight:700; color:var(--text-main);">Overall Feeder System Availability</span>
+                        <span style="font-size:14px; font-weight:800; color:var(--success);">${feederAvailability}%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: ${feederAvailability}%;"></div>
+                    </div>
+                </div>`;
+
+            lucide.createIcons();
+        }
+
+        function showPowerModal() {
+            const pbs = document.getElementById("pbsFilter").value;
+            if (pbs === "SELECT") return;
+
+            const modal = document.getElementById("infoModal");
+            const title = document.getElementById("modalTitle");
+            const list = document.getElementById("modalList");
+
+            const subs = globalSubstationPowerData[pbs] || [];
+            title.innerHTML = `<i data-lucide="activity" style="color:var(--primary);"></i> ${pbs} - Substation Wise Telemetry (${subs.length})`;
+
+            if (subs.length === 0) {
+                list.innerHTML = "<p style='text-align:center; color:var(--text-muted); padding:20px;'>No telemetry data available.</p>";
+            } else {
+                let html = `
+                <table class="telemetry-table">
+                    <thead>
+                        <tr>
+                            <th>Substation / Feeder</th>
+                            <th>Status</th>
+                            <th>P <span class="unit-badge">MW</span></th>
+                            <th>I <span class="unit-badge">A</span></th>
+                            <th>V <span class="unit-badge">kV</span></th>
+                            <th>PF</th>
+                            <th>F <span class="unit-badge">Hz</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                subs.forEach(s => {
+                    if (!s.isOnline) {
+                        html += `
+                        <tr style="background:#fff5f5;">
+                            <td><strong>${s.sub}</strong></td>
+                            <td><span style="color:var(--danger); font-weight:700;">OFFLINE</span></td>
+                            <td>--</td><td>--</td><td>--</td><td>--</td><td>--</td>
+                        </tr>`;
+                    } else {
+                        // Display Individual Feeders if available
+                        if (s.feeders && s.feeders.length > 0) {
+                            s.feeders.forEach(f => {
+                                html += `
+                                <tr style="background:var(--surface-subtle);">
+                                    <td><small style="color:var(--text-muted);">↳ ${s.sub} (${f.name})</small></td>
+                                    <td><span style="color:${f.status === 'ON' ? 'var(--success)' : 'var(--danger)'}; font-weight:700;">${f.status}</span></td>
+                                    <td><strong>${f.p}</strong></td>
+                                    <td>${f.i}</td>
+                                    <td>${f.v}</td>
+                                    <td>${f.pf}</td>
+                                    <td>${f.f}</td>
+                                </tr>`;
+                            });
+
+                            html += `
+                            <tr style="border-bottom:2px solid var(--border); background:#e0f2fe;">
+                                <td><strong>${s.sub} (Total Power)</strong></td>
+                                <td><span style="color:var(--success); font-weight:700;">ONLINE</span></td>
+                                <td colspan="5"><strong style="color:var(--primary-dark);">${s.totalP} MW</strong></td>
+                            </tr>`;
+                        } else {
+                            // Standard Unit Display Fallback
+                            html += `
+                            <tr>
+                                <td><strong>${s.sub}</strong> ${s.hasPZEM2 ? '<br><small style="color:var(--text-muted);">(Unit 1)</small>' : ''}</td>
+                                <td><span style="color:var(--success); font-weight:700;">ONLINE</span></td>
+                                <td><strong style="color:var(--primary);">${s.unit1.p}</strong></td>
+                                <td>${s.unit1.i}</td>
+                                <td>${s.unit1.v}</td>
+                                <td>${s.unit1.pf}</td>
+                                <td>${s.unit1.f}</td>
+                            </tr>`;
+
+                            if (s.hasPZEM2) {
+                                html += `
+                                <tr style="background:var(--surface-subtle);">
+                                    <td><small style="color:var(--text-muted);">${s.sub} (Unit 2)</small></td>
+                                    <td>--</td>
+                                    <td><strong>${s.unit2.p}</strong></td>
+                                    <td>${s.unit2.i}</td>
+                                    <td>${s.unit2.v}</td>
+                                    <td>${s.unit2.pf}</td>
+                                    <td>${s.unit2.f}</td>
+                                </tr>
+                                <tr style="border-bottom:2px solid var(--border); background:#e0f2fe;">
+                                    <td colspan="2"><strong>Substation Total Power</strong></td>
+                                    <td colspan="5"><strong style="color:var(--primary-dark);">${s.totalP} MW</strong></td>
+                                </tr>`;
+                            }
+                        }
+                    }
+                });
+
+                html += `</tbody></table>`;
+                list.innerHTML = html;
+            }
+
+            modal.style.display = "flex";
+            lucide.createIcons();
+        }
+
+        function showModal(pbs, type) {
+            const modal = document.getElementById("infoModal");
+            const title = document.getElementById("modalTitle");
+            const list = document.getElementById("modalList");
+            const faults = window.allFaults || [];
+            
+            list.innerHTML = "";
+            const items = (type === "OFF") ? (globalOffFeeders[pbs] || []) : (globalOfflineFeeders[pbs] || []);
+            
+            title.innerHTML = `<i data-lucide="alert-triangle" style="color:var(--danger);"></i> ${pbs} - Feeders ${type} (${items.length})`;
+
+            if (items.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">No feeders currently match this status condition.</div>';
+            } else {
+                items.forEach(item => {
+                    const fault = faults.find(f => 
+                        String(f.pbs || f.PBS || "").trim().toUpperCase() === String(pbs).trim().toUpperCase() &&
+                        String(f.sub || f.SUB || "").trim().toUpperCase() === String(item.sub).trim().toUpperCase() &&
+                        String(f.dev || f.DEV || "").trim().toUpperCase() === String(item.dev).trim().toUpperCase() &&
+                        String(f.relay || f.RELAY || "").trim().toUpperCase() === String(item.relay).trim().toUpperCase()
+                    );
+
+                    const rawReason = fault?.message || fault?.fault || fault?.faultReason || "No log entry recorded.";
+                    const formattedReason = rawReason.replace(/\n/g, "<br>");
+
+                    const div = document.createElement("div");
+                    div.className = "modal-item";
+                    div.innerHTML = `
+                        <div class="modal-item-title">
+                            <span>Substation: <strong>${item.sub}</strong></span>
+                            <span style="color:var(--danger);">${item.relay.toUpperCase()}</span>
+                        </div>
+                        <div class="modal-reason-box">
+                            <strong>Log Details:</strong><br>${formattedReason}
+                        </div>`;
+                    list.appendChild(div);
+                });
+            }
+
+            modal.style.display = "flex";
+            lucide.createIcons();
+        }
+
+        function closeModal(event) {
+            document.getElementById("infoModal").style.display = "none";
+        }
+
+        function onFilterChange() {        
+            renderSummary();
+        }
+
+        async function refreshDashboard() { 
+            await loadAll(); 
+        }
+
+        loadAll();
+        setInterval(loadRealtimeFirebase, 40000);
+        setInterval(loadAppsScriptData, 60000);
+    </script>
+</body>
+</html>
