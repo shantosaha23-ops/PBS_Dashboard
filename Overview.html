@@ -505,9 +505,7 @@
                 </select>
             </div>
 
-            <button class="btn-action btn-details" onclick="openDetailsPage()">
-                <i data-lucide="layout-grid" style="width:16px; height:16px;"></i> Details
-            </button>
+           
 
             <button class="btn-action btn-refresh" onclick="refreshDashboard()">
                 <i data-lucide="refresh-cw" style="width:15px; height:15px;"></i> Refresh
@@ -566,9 +564,7 @@
         let globalOfflineFeeders = {};
         let globalSubstationPowerData = {};
 
-        function openDetailsPage() {
-            window.location.href = 'ALL_PBS.html';
-        }
+       
 
         async function fetchWithRetry(url, options = {}, retries = 2, delay = 1000) {      
             try {            
