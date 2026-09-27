@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>PBS Multi Substation Monitor & VCB Control</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <style>
+        :root { 
+            --bg: #f8fafc; 
+            --card: #ffffff; 
+            --primary: #2563eb; 
+            --primary-dark: #1d4ed8; 
+            --danger: #dc2626; 
+            --danger-glow: rgba(220, 38, 38, 0.25); 
+            --success: #16a34a; 
+            --text-main: #0f172a;
+            --text-sub: #475569;
+            --border: #e2e8f0;
+        }
+
+        body { 
+            margin: 0; 
+            padding: 12px; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
+            background: var(--bg); 
+            color: var(--text-main); 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            box-sizing: border-box;
+            overflow: hidden; 
+        }
+
+        /* App Main Wrapper (Hidden until login) */
+        #app-content {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        #header-area { 
+            flex-shrink: 0; 
+            background: #ffffff; 
+            padding: 16px; 
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+        }
+
+        h1 { 
+            text-align: center; 
+            font-size: 20px; 
+            margin: 0 0 12px 0; 
+            color: #1e3a8a;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        #controls { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 8px; 
+            justify-content: center; 
+        }
+
+        #controls select, #controls input { 
+            flex: 1 1 140px; 
+            box-sizing: border-box;
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            border: 1px solid var(--border); 
+            background: #f8fafc;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #controls select:focus, #controls input:focus {
+            border-color: var(--primary);
+        }
+
+        #subSearch { flex: 2 1 200px; }
+
+        .row-bottom { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 12px; 
+            margin-top: 10px; 
+        }
+
+        .btn-refresh {
+            background-color: var(--primary); 
+            color: #fff; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-refresh:hover { background-color: var(--primary-dark); }
+
+        .btn-logout {
+            background-color: #64748b; 
+            color: #fff; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-logout:hover { background-color: #475569; }
+
+        #onlineStatus { 
+            padding: 6px 14px; 
+            border-radius: 20px; 
+            color: #fff; 
+            background: #64748b; 
+            font-size: 12px;
+            font-weight: 700; 
+            transition: background 0.3s; 
+        }
+
+        #container { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            padding-right: 4px; 
+        }
+
+        .pbs-summary-box {
+            background: #ffffff; 
+            padding: 16px; 
+            margin-top: 12px; 
+            border-radius: 12px; 
+            border-left: 5px solid var(--primary);
+            border-top: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .substationTitle { 
+            margin-top: 16px; 
+            margin-bottom: 10px; 
+            font-size: 18px; 
+            font-weight: 700; 
+            color: #1e3a8a; 
+            background: #eff6ff; 
+            padding: 14px; 
+            border-radius: 12px; 
+            border: 1px solid #dbeafe;
+        }
+
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); 
+            gap: 12px; 
+        }
+
+        .card { 
+            background: var(--card); 
+            padding: 14px; 
+            border-radius: 12px; 
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04); 
+            user-select: none; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .row { display: flex; align-items: center; }
+        
+        .led { 
+            width: 12px; 
+            height: 12px; 
+            border-radius: 50%; 
+            margin-right: 8px; 
+            background: #cbd5e1; 
+            flex-shrink: 0;
+        }
+        .on { background: var(--success); box-shadow: 0 0 6px rgba(22, 163, 74, 0.4); }
+        .off { background: var(--danger); box-shadow: 0 0 6px rgba(220, 38, 38, 0.4); }
+        .blink { animation: blink 1s infinite; }
+        @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+        .label { font-weight: 700; font-size: 15px; color: var(--text-main); }
+        .statusText { margin-top: 6px; font-weight: 600; font-size: 13px; color: var(--text-sub); }
+
+        .pwr-box { 
+            background: #f8fafc; 
+            padding: 8px; 
+            border-radius: 8px; 
+            border: 1px solid var(--border); 
+            font-size: 11px; 
+            text-align: center; 
+            margin-top: 8px; 
+        }
+        .pwr-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+        .pwr-header { font-weight: 700; color: #1e3a8a; font-size: 10px; text-align: left; margin-bottom: 3px; }
+
+        .trip-esp-badge { 
+            padding: 3px 8px; 
+            border-radius: 6px; 
+            font-size: 10px; 
+            font-weight: 700; 
+            color: white; 
+            display: inline-block; 
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .badge-active { background: var(--success); }
+        .badge-offline { background: var(--danger); }
+
+        .trip-control-box { 
+            margin-top: 10px; 
+            padding-top: 10px; 
+            border-top: 1px dashed var(--border); 
+            text-align: center; 
+        }
+
+        .btn-trip { 
+            display: block; 
+            width: 100%; 
+            padding: 8px; 
+            border: none; 
+            border-radius: 8px; 
+            background: var(--danger); 
+            color: #ffffff; 
+            font-size: 12px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            box-shadow: 0 2px 4px var(--danger-glow); 
+            transition: all 0.15s ease; 
+        }
+        .btn-trip:disabled { 
+            background: #cbd5e1; 
+            color: #64748b;
+            box-shadow: none; 
+            cursor: not-allowed; 
+            opacity: 0.8; 
+        }
+        .btn-trip:not(:disabled):active { transform: scale(0.98); }
+
+        .trip-status-text { 
+            margin-top: 5px; 
+            font-size: 11px; 
+            color: #64748b; 
+            min-height: 14px; 
+            font-weight: 600; 
+        }
+
+        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: var(--text-sub); padding-bottom: 20px; }
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(15,23,42,0.4); backdrop-filter: blur(2px); justify-content: center; align-items: center; }
+        .modal-content { background-color: #fff; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 12px; }
+        .modal-title { font-size: 15px; font-weight: 700; color: #1e3a8a; }
+        .close-btn { cursor: pointer; font-size: 20px; font-weight: bold; color: #94a3b8; }
+        .modal-list { list-style: none; padding: 0; margin: 0; }
+        .modal-list li { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+        .clickable-metric { cursor: pointer; text-decoration: underline; }
+        .clickable-metric:hover { color: #b91c1c; }
+
+        /* Login Overlay Styling */
+        #loginOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .login-box {
+            background: #ffffff;
+            padding: 28px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 360px;
+            text-align: center;
+        }
+
+        .login-box h2 {
+            margin-top: 0;
+            color: #1e3a8a;
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 10px 12px;
+            margin: 16px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            box-sizing: border-box;
+            font-size: 14px;
+            outline: none;
+            text-align: center;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 10px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .login-box button:hover {
+            background: var(--primary-dark);
+        }
+
+        #loginError {
+            color: var(--danger);
+            font-size: 12px;
+            margin-top: 10px;
+            font-weight: 600;
+            min-height: 16px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Login Lock Screen -->
+<div id="loginOverlay">
+    <div class="login-box">
+        <h2>🔒 Restricted Access</h2>
+        <p style="font-size:12px; color:#64748b; margin-bottom:0;">Enter Dashboard Authorization Password</p>
+        <input type="password" id="appPasswordInput" placeholder="Enter Password" onkeypress="handleKeyPress(event)">
+        <button onclick="authenticateApp()">Access Dashboard</button>
+        <div id="loginError"></div>
+    </div>
+</div>
+
+<!-- Protected Dashboard Content -->
+<div id="app-content">
+    <div id="header-area">              
+        <h1>Live Dashboard & Remote VCB Trip Control</h1>               
+        <div id="controls">                            
+            <select id="pbsFilter" onchange="onFilterChange()">                                     
+                <option value="SELECT">-- Select PBS --</option>                          
+            </select>                        
+            <select id="subFilter" onchange="renderCards()">                                     
+                <option value="ALL">All Substation</option>                          
+            </select>                        
+            <input type="text" id="subSearch" placeholder="Search Substation..." oninput="renderCards()">            
+        </div>        
+        <div class="row-bottom">                        
+            <button class="btn-refresh" onclick="refreshDashboard()">🔄 Refresh</button>                        
+            <button class="btn-logout" onclick="logoutApp()">🔒 Lock</button>
+            <div id="onlineStatus">Connecting...</div>            
+        </div>
+    </div>
+
+    <div id="container"></div>
+
+    <div id="feederModal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div id="modalTitle" class="modal-title">List</div>
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+            </div>
+            <ul id="modalList" class="modal-list"></ul>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+const FIREBASE_URL = "https://allpbs-f3b0c-default-rtdb.asia-southeast1.firebasedatabase.app";
+const TRIP_FIREBASE_URL = "https://naogaon-ss-default-rtdb.asia-southeast1.firebasedatabase.app";
+const TIMEOUT_MS = 120000;
+const TRIP_OFFLINE_THRESHOLD_MS = 120000; 
+
+let firebaseData = {}; 
+let isInitialLoad = true; 
+let isFetching = false;
+let globalOffFeeders = {}; 
+let globalOfflineFeeders = {};
+const cooldowns = {};
+const tripHardwareStatus = {};
+let pollingInterval = null;
+
+function handleKeyPress(e) {
+    if (e.key === 'Enter') {
+        authenticateApp();
+    }
+}
+
+async function authenticateApp() {
+    const pwdInput = document.getElementById("appPasswordInput").value;
+    const errorEl = document.getElementById("loginError");
+    
+    if (!pwdInput) {
+        errorEl.innerText = "Please enter password";
+        return;
+    }
+
+    errorEl.style.color = "#2563eb";
+    errorEl.innerText = "Verifying...";
+
+    try {
+        // Fetch app password from Firebase
+        const response = await axios.get(`${TRIP_FIREBASE_URL}/settings/appPassword.json`, { timeout: 4000 });
+        const storedPassword = response.data;
+
+        if (storedPassword && pwdInput === String(storedPassword)) {
+            sessionStorage.setItem("app_authenticated", "true");
+            document.getElementById("loginOverlay").style.display = "none";
+            document.getElementById("app-content").style.display = "flex";
+            startDashboard();
+        } else {
+            errorEl.style.color = "#dc2626";
+            errorEl.innerText = "Incorrect Password!";
+        }
+    } catch (e) {
+        console.error("Authentication Error:", e);
+        errorEl.style.color = "#dc2626";
+        errorEl.innerText = "Network Error! Cannot verify password.";
+    }
+}
+
+function checkAuthentication() {
+    if (sessionStorage.getItem("app_authenticated") === "true") {
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("app-content").style.display = "flex";
+        startDashboard();
+    }
+}
+
+function logoutApp() {
+    sessionStorage.removeItem("app_authenticated");
+    if (pollingInterval) clearInterval(pollingInterval);
+    location.reload();
+}
+
+function startDashboard() {
+    refreshDashboard();
+    if (!pollingInterval) {
+        pollingInterval = setInterval(loadRealtimeFirebase, 15000);
+    }
+}
+
+function formatDisplayTime(t) {      
+    if (!t || t === "--") return "--";      
+    const date = new Date(t);      
+    if (isNaN(date.getTime())) return String(t);      
+    const pad = (n) => String(n).padStart(2, '0');      
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +                             
+           `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+async function fetchWithRetry(url, options = {}, retries = 2, delay = 1000) {      
+    try {            
+        return await axios.get(url, options);      
+    } catch (err) {            
+        if (retries <= 0) throw err;            
+        await new Promise(res => setTimeout(res, delay));            
+        return fetchWithRetry(url, options, retries - 1, delay * 1.5);      
+    }
+}
+
+async function pollTripHardware(subName) {
+    try {
+        const response = await axios.get(`${TRIP_FIREBASE_URL}/trips/${subName}.json`, { timeout: 3000 });
+        if (response.data && response.data.lastHeartbeat) {
+            let lastHb = response.data.lastHeartbeat;
+            if (lastHb < 10000000000) {
+                lastHb = lastHb * 1000;
+            }
+            const now = Date.now();
+            tripHardwareStatus[subName] = (now - lastHb) < TRIP_OFFLINE_THRESHOLD_MS; 
+        } else {
+            tripHardwareStatus[subName] = false;
+        }
+    } catch (e) {
+        tripHardwareStatus[subName] = false;
+    }
+    updateTripBadges(subName);
+}
+
+function updateTripBadges(subName) {
+    const isOnline = tripHardwareStatus[subName] === true;
+    const badge = document.getElementById(`trip_badge_${subName}`);
+    if (badge) {
+        badge.className = `trip-esp-badge ${isOnline ? 'badge-active' : 'badge-offline'}`;
+        badge.innerText = `TRIP MODULE: ${isOnline ? 'ACTIVE' : 'OFFLINE / UNREACHABLE'}`;
+    }
+}
+
+async function loadRealtimeFirebase() {        
+    const statusEl = document.getElementById("onlineStatus");        
+    statusEl.innerText = "Loading Live Data...";        
+    statusEl.style.background = "#f59e0b";
+
+    try {                
+        const fbRes = await fetchWithRetry(FIREBASE_URL + "/.json", { timeout: 8000 });                
+        firebaseData = fbRes.data || {};
+
+        if (isInitialLoad) {                        
+            buildFilters();                        
+            isInitialLoad = false;                
+        }
+
+        renderCards();        
+        statusEl.innerText = "ONLINE (Live)";                
+        statusEl.style.background = "#16a34a";        
+    } catch (err) {                
+        console.error("Firebase load error:", err);                
+        statusEl.innerText = "RETRYING...";                
+        statusEl.style.background = "#dc2626";        
+    }
+}
+
+async function loadAll() {        
+    if (isFetching) return;        
+    isFetching = true;
+    await loadRealtimeFirebase();        
+    isFetching = false;
+}
+
+function buildFilters() {        
+    const pbsFilter = document.getElementById("pbsFilter");        
+    const subFilter = document.getElementById("subFilter");        
+    const currentPbs = pbsFilter.value;        
+    const currentSub = subFilter.value;        
+    const pbsList = Object.keys(firebaseData);
+
+    pbsFilter.innerHTML = '<option value="SELECT">-- Select PBS --</option>' +                  
+        pbsList.map(v => `<option value="${v}" ${v === currentPbs ? 'selected' : ''}>${v}</option>`).join('');                    
+
+    let subList = [];        
+    if (currentPbs !== "SELECT" && currentPbs !== "ALL") {                
+        subList = Object.keys(firebaseData[currentPbs] || {});        
+    }                    
+    subList = [...new Set(subList)];        
+    subFilter.innerHTML = '<option value="ALL">All Substation</option>' +                  
+        subList.map(v => `<option value="${v}" ${v === currentSub ? 'selected' : ''}>${v}</option>`).join('');
+}
+
+function renderCards() {      
+    const container = document.getElementById("container");      
+    container.innerHTML = "";      
+    const pbsFilter = document.getElementById("pbsFilter").value;
+
+    if (pbsFilter === "SELECT") {              
+        container.innerHTML = '<div style="text-align:center; margin-top:50px; color:#64748b; font-size:14px;">Please select a PBS from the dropdown to view monitor data.</div>';              
+        return;      
+    }              
+
+    const subFilter = document.getElementById("subFilter").value;      
+    const searchVal = document.getElementById("subSearch").value.toLowerCase();          
+    const now = Date.now();      
+
+    globalOffFeeders = {};
+    globalOfflineFeeders = {};
+
+    for (let pbs in firebaseData) {            
+        if (pbsFilter !== "ALL" && pbs !== pbsFilter) continue;                            
+        let pbsOnCount = 0, pbsOffCount = 0, pbsOfflineFeederCount = 0;
+        let pbsOnlineFeederTotal = 0, pbsGrandFeederTotal = 0, pbsOnlineSubs = 0;            
+        let pbsTotalPowerMW = 0.0;        
+        let pbsTotalSubs = Object.keys(firebaseData[pbs] || {}).length;
+
+        globalOffFeeders[pbs] = [];
+        globalOfflineFeeders[pbs] = [];
+
+        for (let sub in firebaseData[pbs]) {                  
+            let isSubOnline = false;                  
+            for (let dev in firebaseData[pbs][sub]) {                        
+                const hb = (firebaseData[pbs][sub][dev].lastHeartbeat || 0) * 1000;                        
+                if ((now - hb) < TIMEOUT_MS) isSubOnline = true;                  
+            }
+
+            for (let dev in firebaseData[pbs][sub]) {
+                for (let relay in firebaseData[pbs][sub][dev]) {
+                    if (["power", "deviceStatus", "lastHeartbeat", "ip"].includes(relay)) continue;
+                    
+                    pbsGrandFeederTotal++;
+
+                    if (isSubOnline) {
+                        pbsOnlineFeederTotal++;
+                        if (firebaseData[pbs][sub][dev][relay].status === "ON") {
+                            pbsOnCount++;
+                        } else {
+                            pbsOffCount++;
+                            globalOffFeeders[pbs].push({ sub, dev, relay });
+                        }
+                    } else {
+                        pbsOfflineFeederCount++;
+                        globalOfflineFeeders[pbs].push({ sub, dev, relay });
+                    }
+                }
+            }
+
+            if (isSubOnline) {                        
+                pbsOnlineSubs++;                        
+                for (let dev in firebaseData[pbs][sub]) { 
+                    let hasFeederPower = false;
+                    for (let relay in firebaseData[pbs][sub][dev]) {                                    
+                        if (["power", "deviceStatus", "lastHeartbeat", "ip"].includes(relay)) continue;                                    
+                        const fPwr = firebaseData[pbs][sub][dev][relay].power;
+                        if (fPwr && fPwr.P !== undefined) {
+                            pbsTotalPowerMW += Number(fPwr.P || 0);
+                            hasFeederPower = true;
+                        }
+                    }                                                
+                    if (!hasFeederPower) {
+                        const pwr = firebaseData[pbs][sub][dev].power || {};                    
+                        if (pwr && Object.keys(pwr).length > 0) {                        
+                            const p1 = Number(pwr.P1 ?? pwr.P ?? pwr.p ?? 0);                        
+                            const p2 = Number(pwr.P2 ?? 0);                        
+                            pbsTotalPowerMW += (p1 + p2);                    
+                        }                
+                    }
+                }                  
+            }            
+        }                    
+
+        const pbsHeader = document.createElement("div");            
+        pbsHeader.className = "pbs-summary-box";
+        pbsHeader.innerHTML = `
+            <h2 style="margin:0; font-size:16px; color:#1e3a8a;">${pbs} Summary</h2>                    
+            <div style="margin-top:8px; font-size:13px; line-height:1.6; color:var(--text-sub);">                            
+                Substations Online: <b style="color:var(--text-main);">${pbsOnlineSubs} / ${pbsTotalSubs}</b><br>                            
+                Feeders ON: <b style="color:var(--text-main);">${pbsOnCount} / ${pbsOnlineFeederTotal}</b> <span style="color:#94a3b8; font-size:11px;">(Total: ${pbsGrandFeederTotal})</span><br>                
+                Feeders OFF: <b class="clickable-metric" style="color:#dc2626;" onclick="showModal('${pbs}', 'OFF')">${pbsOffCount}</b><br>
+                Feeders Offline: <b class="clickable-metric" style="color:#d97706;" onclick="showModal('${pbs}', 'OFFLINE')">${pbsOfflineFeederCount}</b><br>
+                Total Power: <b style="color:#1d4ed8;">${pbsTotalPowerMW.toFixed(2)} MW</b>            
+            </div>`;            
+        container.appendChild(pbsHeader);
+
+        for (let sub in firebaseData[pbs]) {                            
+            if (subFilter !== "ALL" && sub !== subFilter) continue;                  
+            if (searchVal && !sub.toLowerCase().includes(searchVal)) continue;                                          
+
+            pollTripHardware(sub);
+
+            let isSubOnline = false, subOnCount = 0, subTotalCount = 0;                  
+            let lastUpdateTime = 0;             
+
+            let hasPZEM2 = false;            
+            let subV1=0, subI1=0, subP1=0, subPF1=0, subF1=0, count1=0;            
+            let subV2=0, subI2=0, subP2=0, subPF2=0, subF2=0, count2=0;
+
+            for (let dev in firebaseData[pbs][sub]) {                        
+                const device = firebaseData[pbs][sub][dev];                        
+                const lastHeartbeat = (device.lastHeartbeat || 0) * 1000;                        
+                if ((now - lastHeartbeat) < TIMEOUT_MS) isSubOnline = true;                        
+                if (lastHeartbeat > lastUpdateTime) lastUpdateTime = lastHeartbeat;                  
+            }
+
+            if (isSubOnline) {                          
+                for (let dev in firebaseData[pbs][sub]) {                                
+                    const device = firebaseData[pbs][sub][dev];                                
+                    for (let relay in device) {                                        
+                        if (["power", "deviceStatus", "lastHeartbeat", "ip"].includes(relay)) continue;                                       
+                        subTotalCount++;                                       
+                        if (device[relay].status === "ON") subOnCount++; 
+                    }                                                    
+                    
+                    const pwr = device.power || {};                                
+                    if (pwr && Object.keys(pwr).length > 0) {                                      
+                        subV1 += Number(pwr.V1 ?? pwr.V ?? pwr.v ?? 0);                         
+                        subI1 += Number(pwr.I1 ?? pwr.I ?? pwr.c ?? 0);                                      
+                        subP1 += Number(pwr.P1 ?? pwr.P ?? pwr.p ?? 0);                         
+                        subPF1 += Number(pwr.PF1 ?? pwr.PF ?? pwr.pf ?? 0);                                      
+                        subF1 += Number(pwr.F1 ?? pwr.F ?? pwr.f ?? 0);                         
+                        count1++;
+
+                        if (pwr.V2 !== undefined || pwr.I2 !== undefined || pwr.P2 !== undefined) {                            
+                            hasPZEM2 = true;                            
+                            subV2 += Number(pwr.V2 || 0);                             
+                            subI2 += Number(pwr.I2 || 0);                                          
+                            subP2 += Number(pwr.P2 || 0);                             
+                            subPF2 += Number(pwr.PF2 || 0);                                          
+                            subF2 += Number(pwr.F2 || 0);                             
+                            count2++;                        
+                        }                    
+                    }                          
+                }                  
+            }
+
+            const displayV1  = count1 ? (subV1 / count1).toFixed(2) : "0.00";
+            const displayI1  = subI1.toFixed(2);
+            const displayP1  = subP1.toFixed(2);
+            const displayPF1 = count1 ? (subPF1 / count1).toFixed(2) : "0.00";
+            const displayF1  = count1 ? (subF1 / count1).toFixed(2) : "0.00";
+
+            let powerDisplayHtml = "";            
+            if (isSubOnline) {                
+                if (hasPZEM2) {                    
+                    const subTotalP = (subP1 + subP2).toFixed(2);
+                    powerDisplayHtml = `                    
+                    <div class="pwr-box">                        
+                        <div class="pwr-header">Unit-1</div>                        
+                        <div class="pwr-grid">                            
+                            <div><b style="color:#64748b;">V:</b> ${displayV1}KV</div>                            
+                            <div><b style="color:#64748b;">I:</b> ${displayI1}A</div>                            
+                            <div><b style="color:#64748b;">P:</b> <span style="color:#1d4ed8; font-weight:bold;">${displayP1}MW</span></div>                            
+                            <div><b style="color:#64748b;">PF:</b> ${displayPF1}</div>                            
+                            <div><b style="color:#64748b;">F:</b> ${displayF1}Hz</div>                        
+                        </div>                        
+                        <div class="pwr-header" style="margin-top:6px;">Unit-2</div>                        
+                        <div class="pwr-grid">                            
+                            <div><b style="color:#64748b;">V:</b> ${(count2 ? (subV2/count2).toFixed(2) : "0.00")}KV</div>                            
+                            <div><b style="color:#64748b;">I:</b> ${subI2.toFixed(2)}A</div>                            
+                            <div><b style="color:#64748b;">P:</b> ${subP2.toFixed(2)}MW</div>                            
+                            <div><b style="color:#64748b;">PF:</b> ${(count2 ? (subPF2/count2).toFixed(2) : "0.00")}</div>                            
+                            <div><b style="color:#64748b;">F:</b> ${(count2 ? (subF2/count2).toFixed(2) : "0.00")}Hz</div>                        
+                        </div>                    
+                        <div style="margin-top:6px; padding-top:4px; border-top:1px dashed var(--border); text-align:center; font-weight:bold; color:#1d4ed8; font-size:11px;">
+                            Total Power: ${subTotalP} MW
+                        </div>
+                    </div>`;                
+                } else {                    
+                    powerDisplayHtml = `                    
+                    <div class="pwr-box">                        
+                        <div class="pwr-grid">                            
+                            <div><b style="color:#64748b;">V:</b> ${displayV1}KV</div>                            
+                            <div><b style="color:#64748b;">I:</b> ${displayI1}A</div>                            
+                            <div><b style="color:#64748b;">P:</b> <span style="color:#1d4ed8; font-weight:bold;">${displayP1}MW</span></div>                            
+                            <div><b style="color:#64748b;">PF:</b> ${displayPF1}</div>                            
+                            <div><b style="color:#64748b;">F:</b> ${displayF1}Hz</div>                        
+                        </div>                    
+                    </div>`;                
+                }            
+            } else {                
+                powerDisplayHtml = `                
+                <div class="pwr-box">                    
+                    <div class="pwr-grid">                        
+                        <div><b style="color:#64748b;">V:</b> ----</div>                        
+                        <div><b style="color:#64748b;">I:</b> ----</div>                        
+                        <div><b style="color:#64748b;">P:</b> ----</div>                        
+                        <div><b style="color:#64748b;">PF:</b> ----</div>                        
+                        <div><b style="color:#64748b;">F:</b> ----</div>                    
+                    </div>                
+                </div>`;            
+            }
+
+            const feederStatusText = isSubOnline 
+                ? `<span style="color:#2563eb;">${subOnCount}/${subTotalCount} Feeders ON</span>`
+                : `<span style="color:#dc2626;">Signal Lost / Substation Offline</span>`;
+
+            const isTripActive = tripHardwareStatus[sub] === true;
+
+            const title = document.createElement("div");                  
+            title.className = "substationTitle";                  
+            title.innerHTML = `                        
+                <div style="display:flex; justify-content:space-between; align-items:center;">                              
+                    <span>${sub}</span>                              
+                    <span style="font-size:12px; font-weight:700;">${feederStatusText}</span>                        
+                </div>                        
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">                               
+                    <span id="trip_badge_${sub}" class="trip-esp-badge ${isTripActive ? 'badge-active' : 'badge-offline'}">
+                        TRIP MODULE: ${isTripActive ? 'ACTIVE' : 'OFFLINE / UNREACHABLE'}
+                    </span>
+                    <span style="font-size:12px; font-weight:700; color:${isSubOnline ? '#16a34a' : '#dc2626'}">● ${isSubOnline ? "ONLINE" : "OFFLINE"}</span>                        
+                </div>
+                <div style="margin-top:6px; font-size:11px; color:#64748b;">Updated: ${lastUpdateTime > 0 ? formatDisplayTime(lastUpdateTime) : '----'}</div>                        
+                ${powerDisplayHtml}`;                  
+            container.appendChild(title);            
+
+            const grid = document.createElement("div");                  
+            grid.className = "grid";                  
+            container.appendChild(grid);
+
+            for (let dev in firebaseData[pbs][sub]) {                        
+                for (let relay in firebaseData[pbs][sub][dev]) {                              
+                    if (["power", "deviceStatus", "lastHeartbeat", "ip"].includes(relay)) continue;                                                                      
+                    const fb = firebaseData[pbs][sub][dev][relay];                              
+                    const id = `${pbs}_${sub}_${dev}_${relay}`.replace(/\s+/g, '_');                              
+
+                    const displayStatus = isSubOnline ? (fb.status || "----") : "----";                              
+                    const ledClass = isSubOnline ? (fb.status === "ON" ? "on" : "off blink") : "";
+
+                    let feederPowerHtml = "";
+                    if (isSubOnline && fb.power && typeof fb.power === "object") {
+                        const fV  = Number(fb.power.V ?? 0).toFixed(2);
+                        const fI  = Number(fb.power.I ?? 0).toFixed(2);
+                        const fP  = Number(fb.power.P ?? 0).toFixed(2);
+                        const fPF = Number(fb.power.PF ?? 0).toFixed(2);
+                        
+                        feederPowerHtml = `
+                            <div class="pwr-box" style="margin-top:6px; background:#f8fafc; border:1px solid #e2e8f0;">
+                                <div class="pwr-grid" style="grid-template-columns: repeat(4, 1fr); font-size:10px;">
+                                    <div><b style="color:#64748b;">V:</b> ${fV}kV</div>
+                                    <div><b style="color:#64748b;">I:</b> ${fI}A</div>
+                                    <div><b style="color:#64748b;">P:</b> ${fP}MW</div>
+                                    <div><b style="color:#64748b;">PF:</b> ${fPF}</div>
+                                </div>
+                            </div>`;
+                    } else if (!isSubOnline) {
+                        feederPowerHtml = `
+                            <div class="pwr-box" style="margin-top:6px; background:#f8fafc;">
+                                <div class="pwr-grid" style="grid-template-columns: repeat(4, 1fr); font-size:10px;">
+                                    <div><b style="color:#64748b;">V:</b> ----</div>
+                                    <div><b style="color:#64748b;">I:</b> ----</div>
+                                    <div><b style="color:#64748b;">P:</b> ----</div>
+                                    <div><b style="color:#64748b;">PF:</b> ----</div>
+                                </div>
+                            </div>`;
+                    }
+
+                    const feederKey = relay.toUpperCase();
+
+                    const isFeederOff = (fb.status !== "ON");
+                    const isLockedByCooldown = cooldowns[id] && cooldowns[id].active;
+                    const isTripHardwareOffline = !tripHardwareStatus[sub];
+                    
+                    const isButtonDisabled = (!isSubOnline || isFeederOff || isTripHardwareOffline || isLockedByCooldown);
+
+                    let lockReasonText = "Interlock Ready";
+                    if (!isSubOnline) lockReasonText = "LOCKED (Substation Offline)";
+                    else if (isTripHardwareOffline) lockReasonText = "LOCKED (Trip Module Unreachable)";
+                    else if (isFeederOff) lockReasonText = "LOCKED (Feeder OFF)";
+                    else if (isLockedByCooldown) lockReasonText = `LOCKED (${cooldowns[id].remaining}s)`;
+
+                    grid.innerHTML += `                              
+                        <div class="card">                                    
+                            <div>
+                                <div class="row">                                          
+                                    <div class="led ${ledClass}"></div>                                          
+                                    <div class="label">${feederKey}</div>                                    
+                                </div>                                    
+                                <div class="statusText">Status: ${displayStatus}</div>                                    
+                                ${feederPowerHtml}
+                            </div>
+                            <div class="trip-control-box">
+                                <button id="btn_${id}" class="btn-trip" ${isButtonDisabled ? 'disabled' : ''} onclick="executeVcbTrip('${id}', '${feederKey}', '${sub}')">
+                                    TRIP VCB
+                                </button>
+                                <div id="status_${id}" class="trip-status-text" style="${isButtonDisabled ? 'color:#dc2626;' : ''}">${lockReasonText}</div>
+                            </div>
+                        </div>`;                        
+                }                  
+            }      
+        }      
+    }      
+    container.innerHTML += '<div class="footer"><b>Developed by: Shanta Saha</b><br>AGM (O&amp;M)<br>Naogaon PBS-1</div>';
+}
+
+async function executeVcbTrip(id, feederKey, subName) {
+    if (!tripHardwareStatus[subName]) {
+        alert("Cannot send trip signal: The Trip module is offline!");
+        return;
+    }
+
+    if (confirm(`WARNING: Are you sure you want to send remote TRIP signal to ${feederKey}?`)) {
+        const pwd = prompt('Enter authorization password:');
+        if (pwd === null || pwd.trim() === '') return;
+
+        const status = document.getElementById('status_' + id);
+        if (status) {
+            status.innerText = 'Verifying Password...';
+            status.style.color = '#2563eb';
+        }
+
+        try {
+            // Fetch password from Firebase
+            const pwdResponse = await axios.get(`${TRIP_FIREBASE_URL}/settings/tripPassword.json`, { timeout: 4000 });
+            const storedPassword = pwdResponse.data;
+
+            if (!storedPassword || pwd !== String(storedPassword)) {
+                alert('Incorrect password! Access denied.');
+                if (status) {
+                    status.innerText = 'Access Denied';
+                    status.style.color = '#dc2626';
+                }
+                return;
+            }
+
+            if (status) {
+                status.innerText = 'Sending Remote Command...';
+                status.style.color = '#dc2626';
+            }
+
+            const payload = {
+                feederId: feederKey,
+                trigger: true,
+                timestamp: { ".sv": "timestamp" }
+            };
+
+            await axios.put(`${TRIP_FIREBASE_URL}/trips/${subName}.json`, payload);
+            
+            if (status) {
+                status.innerText = 'Pulse Command Dispatched!';
+                status.style.color = '#16a34a';
+            }
+            startCooldown(id, 60);
+
+        } catch (err) {
+            console.error("Trip / Password Verification Error:", err);
+            if (status) {
+                status.innerText = 'Verification / Dispatch Error!';
+                status.style.color = '#d97706';
+            }
+            alert('Failed to connect to Database to verify authorization.');
+        }
+    }
+}
+
+function startCooldown(id, seconds) {
+    const btn = document.getElementById('btn_' + id);
+    if (cooldowns[id] && cooldowns[id].timer) clearInterval(cooldowns[id].timer);
+    
+    cooldowns[id] = { active: true, remaining: seconds, timer: null };
+    if (btn) btn.disabled = true;
+
+    cooldowns[id].timer = setInterval(() => {
+        cooldowns[id].remaining--;
+        const rem = cooldowns[id].remaining;
+        const statusEl = document.getElementById('status_' + id);
+
+        if (statusEl) {
+            statusEl.innerText = `LOCKED (${rem}s)`;
+            statusEl.style.color = '#dc2626';
+        }
+
+        if (rem <= 0) {
+            clearInterval(cooldowns[id].timer);
+            cooldowns[id].active = false;
+            renderCards();
+        }
+    }, 1000);
+}
+
+function showModal(pbs, type) {
+    const modal = document.getElementById("feederModal");
+    const title = document.getElementById("modalTitle");
+    const list = document.getElementById("modalList");
+    
+    list.innerHTML = "";
+    const items = (type === "OFF") ? globalOffFeeders[pbs] : globalOfflineFeeders[pbs];
+    title.innerText = `${pbs} - Feeders ${type} (${items ? items.length : 0})`;
+
+    if (!items || items.length === 0) {
+        list.innerHTML = '<li style="justify-content:center; color:#94a3b8;">No feeders found.</li>';
+    } else {
+        items.forEach(item => {
+            const li = document.createElement("li");
+            li.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span><b>${item.sub}</b></span> 
+                    <span style="color:#dc2626; font-weight:bold;">${item.relay.toUpperCase()}</span>
+                </div>`;
+            list.appendChild(li);
+        });
+    }
+
+    modal.style.display = "flex";
+}
+
+function closeModal(event) {
+    const modal = document.getElementById("feederModal");
+    modal.style.display = "none";
+}
+
+function onFilterChange() {        
+    document.getElementById("subFilter").value = "ALL";        
+    buildFilters();        
+    renderCards();
+}
+
+async function refreshDashboard() { await loadAll(); }
+
+// Check authentication status when page loads
+checkAuthentication();
+</script>
+</body>
+</html>
