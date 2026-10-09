@@ -129,8 +129,10 @@ function handleOfflineTypeChange(subKey) {
 
     if (typeEl.value === "LS") {
         inputEl.value = "Loadshedding";
+    } else if (typeEl.value === "SCADA") {
+        inputEl.value = "SCADA"; // You can change this text if needed
     } else {
-        if (inputEl.value === "Loadshedding") {
+        if (inputEl.value === "Loadshedding" || inputEl.value === "SCADA") {
             inputEl.value = "";
         }
     }
@@ -455,7 +457,8 @@ function renderCards() {
                                 <option value="Power Outage">Power Outage</option>
                                 <option value="Signal Lost">Signal Lost</option>
                                 <option value="Shutdown / Maintenance">Shutdown / Maintenance</option>
-                                <option value="LS">Load shedding</option>
+                                <option value="LS">Loadshedding</option>
+                                <option value="SCADA">SCADA</option>
                                 <option value="Others">Others</option>
                             </select>
                             <input type="text" id="offlineInput_${safeSubKey}" placeholder="Enter offline reason..." style="margin-bottom:2px; font-size:12px;">
@@ -540,7 +543,7 @@ function renderCards() {
                                     <select id="type_${id}" onchange="handleTypeChange('${id}')" style="padding:4px; font-size:11px; border-radius:4px; border:1px solid #ccc;">
                                         <option value="Fault">Fault Reason</option>
                                         <option value="Shutdown">Shutdown / Maintenance</option>
-                                        <option value="LS">Load shedding</option>
+                                        <option value="LS">Loadshedding</option>
                                         <option value="Others">Others</option>
                                     </select>
                                     <input type="text" id="input_${id}" placeholder="Enter details..." style="margin-bottom:2px; font-size:12px;">                                                       
