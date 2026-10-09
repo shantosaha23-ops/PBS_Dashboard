@@ -121,6 +121,21 @@ function handleTypeChange(id) {
     }
 }
 
+function handleOfflineTypeChange(subKey) {
+    const safeKey = subKey.replace(/\s+/g, '_');
+    const typeEl = document.getElementById("offlineType_" + safeKey);
+    const inputEl = document.getElementById("offlineInput_" + safeKey);
+    if (!typeEl || !inputEl) return;
+
+    if (typeEl.value === "LS") {
+        inputEl.value = "Loadshedding";
+    } else {
+        if (inputEl.value === "Loadshedding") {
+            inputEl.value = "";
+        }
+    }
+}
+
 async function fetchWithRetry(url, options = {}, retries = 2, delay = 1000) {      
     try {            
         return await axios.get(url, options);      
@@ -161,6 +176,7 @@ async function loadAppsScriptData() {
         const gasRes = await fetchWithRetry(SCRIPT_URL + "?mode=allData", { timeout: 20000 });                
         sheetTripData = gasRes.data?.trip || [];                
         window.allFaults = gasRes.data?.fault || [];
+        window.offlineRemarks = gasRes.data?.offlineRemarks || [];
 
         renderCards();        
         statusEl.innerText = "ONLINE (Synced)";                
@@ -220,6 +236,7 @@ function renderCards() {
     const now = Date.now();      
     const TIMEOUT_MS = 100000;      
     const faults = window.allFaults || [];
+    const offlineRemarksList = window.offlineRemarks || [];
 
     globalOffFeeders = {};
     globalOfflineFeeders = {};
@@ -411,6 +428,42 @@ function renderCards() {
                 ? `<span style="color:#2d9cff;">${subOnCount}/${subTotalCount} Feeders ON</span>`
                 : `<span style="color:#c62828;">Signal Lost/Power Outage</span>`;
 
+            // Handle Offline Remarks Box Input Flow (Max 2 entries with serial numbers 1, 2)
+            const safeSubKey = sub.replace(/\s+/g, '_');
+            const offlineMatch = offlineRemarksList.find(o => 
+                String(o.pbs || "").trim().toUpperCase() === String(pbs).trim().toUpperCase() &&
+                String(o.sub || "").trim().toUpperCase() === String(sub).trim().toUpperCase()
+            );
+            const offlineLogText = offlineMatch?.remarks || "";
+            const offlineLogs = offlineLogText ? offlineLogText.split("\n").filter(Boolean) : [];
+
+            let offlineBoxHtml = "";
+            if (!isSubOnline) {
+                const historyHtml = offlineLogs.map((log, index) => {
+                    const cleanLog = log.replace(/^\d+\.\s*/, '');
+                    return `<div style="font-size:11px; margin-bottom:3px; border-bottom:1px dashed #ffccbc; padding-bottom:2px; color:#d84315;"><b>${index + 1}.</b> ${cleanLog}</div>`;
+                }).join("");
+
+                const showOfflineInput = offlineLogs.length < 2;
+
+                offlineBoxHtml = `
+                    <div class="faultBox" id="offlineBox_${safeSubKey}" style="display:block; background:#fff3e0; border-color:#ffb74d;" onclick="event.stopPropagation()">
+                        ${offlineLogs.length > 0 ? `<div style="font-weight:700; color:#e65100; font-size:11px; margin-bottom:4px;">Offline Log History:</div><div style="max-height:70px; overflow-y:auto; margin-bottom:6px;">${historyHtml}</div>` : ''}
+                        
+                        ${showOfflineInput ? `<div style="display:flex; flex-direction:column; gap:4px;">
+                            <select id="offlineType_${safeSubKey}" onchange="handleOfflineTypeChange('${sub}')" style="padding:4px; font-size:11px; border-radius:4px; border:1px solid #ccc;">
+                                <option value="Power Outage">Power Outage</option>
+                                <option value="Signal Lost">Signal Lost</option>
+                                <option value="Shutdown / Maintenance">Shutdown / Maintenance</option>
+                                <option value="LS">Load shedding</option>
+                                <option value="Others">Others</option>
+                            </select>
+                            <input type="text" id="offlineInput_${safeSubKey}" placeholder="Enter offline reason..." style="margin-bottom:2px; font-size:12px;">
+                            <button class="smallBtn" style="background-color:#e65100;" onclick="saveOfflineReason('${pbs}', '${sub}')">Save Reason</button>
+                        </div>` : ''}
+                    </div>`;
+            }
+
             const title = document.createElement("div");                  
             title.className = "substationTitle";                  
             title.innerHTML = `                        
@@ -422,7 +475,8 @@ function renderCards() {
                     <span style="font-size:11px; color:#555;">Updated: ${lastUpdateTime > 0 ? formatDisplayTime(lastUpdateTime) : '--'}</span>                               
                     <span style="font-size:13px; color:${isSubOnline ? '#2ecc71' : '#c62828'}">● ${isSubOnline ? "ONLINE" : "OFFLINE"}</span>                        
                 </div>                        
-                ${powerDisplayHtml}`;                  
+                ${powerDisplayHtml}
+                ${offlineBoxHtml}`;                  
             container.appendChild(title);            
 
             const grid = document.createElement("div");                  
@@ -471,15 +525,18 @@ function renderCards() {
                     let faultBoxHtml = "";                              
                     if (!isStatusOn) { 
                         const logs = faultReason ? faultReason.split("\n").filter(Boolean) : [];
-                        const historyHtml = logs.map(log => 
-                            `<div style="font-size:11px; margin-bottom:3px; border-bottom:1px dashed #cce3f7; padding-bottom:2px; color:#1a237e;">• ${log}</div>`
-                        ).join("");
+                        const historyHtml = logs.map((log, index) => {
+                            const cleanLog = log.replace(/^\d+\.\s*/, '');
+                            return `<div style="font-size:11px; margin-bottom:3px; border-bottom:1px dashed #cce3f7; padding-bottom:2px; color:#1a237e;"><b>${index + 1}.</b> ${cleanLog}</div>`;
+                        }).join("");
+
+                        const showFaultInput = logs.length < 5;
 
                         faultBoxHtml = `                                                
                             <div class="faultBox" id="fault_${id}" style="display:block" onclick="event.stopPropagation()">                                                       
                                 ${logs.length > 0 ? `<div style="font-weight:700; color:#0d47a1; font-size:11px; margin-bottom:4px;">Log History:</div><div style="max-height:70px; overflow-y:auto; margin-bottom:6px;">${historyHtml}</div>` : ''}
                                 
-                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                ${showFaultInput ? `<div style="display:flex; flex-direction:column; gap:4px;">
                                     <select id="type_${id}" onchange="handleTypeChange('${id}')" style="padding:4px; font-size:11px; border-radius:4px; border:1px solid #ccc;">
                                         <option value="Fault">Fault Reason</option>
                                         <option value="Shutdown">Shutdown / Maintenance</option>
@@ -488,7 +545,7 @@ function renderCards() {
                                     </select>
                                     <input type="text" id="input_${id}" placeholder="Enter details..." style="margin-bottom:2px; font-size:12px;">                                                       
                                     <button class="smallBtn" onclick="saveFault('${id}')">Save</button>                                                
-                                </div>
+                                </div>` : ''}
                             </div>`;                                    
                     }
 
@@ -581,7 +638,6 @@ async function saveFault(id) {
     const formattedMessage = `${type}: ${reason}`;
     const obj = cardMap[id];      
 
-    // 1. Get the save button inside the card & set loading state
     const btn = faultBox ? faultBox.querySelector(".smallBtn") : null;
     let originalBtnText = "Save";
     if (btn) {
@@ -589,16 +645,12 @@ async function saveFault(id) {
         btn.innerText = "⏳ Saving...";
         btn.disabled = true;
         btn.style.opacity = "0.7";
-        btn.style.cursor = "not-allowed";
     }
 
     try {            
         const postUrl = `${SCRIPT_URL}?pbs=${encodeURIComponent(obj.pbs)}&sub=${encodeURIComponent(obj.sub)}&dev=${encodeURIComponent(obj.dev)}&relay=${encodeURIComponent(obj.relay)}&message=${encodeURIComponent(formattedMessage)}`;            
-        
-        // Send request to Google Apps Script
         await fetch(postUrl, { method: "POST", mode: "no-cors" });            
         
-        // 2. Optimistically update local data array so the UI updates immediately
         const timestamp = new Date();
         const pad = (n) => String(n).padStart(2, '0');
         const formattedTime = `${timestamp.getFullYear()}-${pad(timestamp.getMonth() + 1)}-${pad(timestamp.getDate())} ${pad(timestamp.getHours())}:${pad(timestamp.getMinutes())}`;
@@ -624,32 +676,97 @@ async function saveFault(id) {
             });
         }
 
-        // 3. Clear input & show instant success feedback on button
         inputEl.value = "";
         if (btn) {
             btn.innerText = "✔ Saved!";
             btn.style.backgroundColor = "#2ecc71";
-            
-            // Reset button back to normal state after 2 seconds
             setTimeout(() => {
                 btn.innerText = originalBtnText;
                 btn.disabled = false;
                 btn.style.opacity = "1";
-                btn.style.cursor = "pointer";
                 btn.style.backgroundColor = "#2d9cff";
             }, 2000);
         }
 
-        // 4. Instantly re-render cards to display the new entry in the log history list
         renderCards();
-
     } catch (e) {            
         alert("Failed to save entry. Please try again.");      
         if (btn) {
             btn.innerText = originalBtnText;
             btn.disabled = false;
             btn.style.opacity = "1";
-            btn.style.cursor = "pointer";
+        }
+    }
+}
+
+async function saveOfflineReason(pbs, sub) {
+    const safeKey = sub.replace(/\s+/g, '_');
+    const inputEl = document.getElementById("offlineInput_" + safeKey);
+    const typeEl = document.getElementById("offlineType_" + safeKey);
+    const faultBox = document.getElementById("offlineBox_" + safeKey);
+    if (!inputEl) return;
+
+    const reason = inputEl.value.trim();
+    const type = typeEl ? typeEl.value : "Note";
+    if (!reason) return alert("Enter details first");
+
+    const formattedMessage = `${type}: ${reason}`;
+    const dev = "DEV_001";
+
+    const btn = faultBox ? faultBox.querySelector(".smallBtn") : null;
+    let originalBtnText = "Save Reason";
+    if (btn) {
+        originalBtnText = btn.innerText;
+        btn.innerText = "⏳ Saving...";
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+    }
+
+    try {
+        const postUrl = `${SCRIPT_URL}?isOffline=true&pbs=${encodeURIComponent(pbs)}&sub=${encodeURIComponent(sub)}&dev=${encodeURIComponent(dev)}&message=${encodeURIComponent(formattedMessage)}`;
+        await fetch(postUrl, { method: "POST", mode: "no-cors" });
+
+        const timestamp = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const formattedTime = `${timestamp.getFullYear()}-${pad(timestamp.getMonth() + 1)}-${pad(timestamp.getDate())} ${pad(timestamp.getHours())}:${pad(timestamp.getMinutes())}`;
+        const newLogEntry = `[${formattedTime}] ${formattedMessage}`;
+
+        if (!window.offlineRemarks) window.offlineRemarks = [];
+        let existingOff = window.offlineRemarks.find(o => 
+            String(o.pbs || "").trim().toUpperCase() === String(pbs).trim().toUpperCase() &&
+            String(o.sub || "").trim().toUpperCase() === String(sub).trim().toUpperCase()
+        );
+
+        if (existingOff) {
+            existingOff.remarks = existingOff.remarks ? existingOff.remarks + "\n" + newLogEntry : newLogEntry;
+        } else {
+            window.offlineRemarks.push({
+                pbs: pbs,
+                sub: sub,
+                dev: dev,
+                remarks: newLogEntry
+            });
+        }
+
+        inputEl.value = "";
+        if (btn) {
+            btn.innerText = "✔ Saved!";
+            btn.style.backgroundColor = "#2ecc71";
+            setTimeout(() => {
+                btn.innerText = originalBtnText;
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                btn.style.backgroundColor = "#e65100";
+            }, 2000);
+        }
+
+        renderCards();
+    } catch (e) {
+        alert("Failed to save offline reason.");
+        if (btn) {
+            btn.innerText = originalBtnText;
+            btn.disabled = false;
+            btn.style.opacity = "1";
         }
     }
 }
