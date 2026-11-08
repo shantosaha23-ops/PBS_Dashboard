@@ -36,7 +36,7 @@
             font-size: 12px; font-weight: bold; text-align: center; padding: 12px 0;
             text-transform: uppercase;
         }
-        .grid-normal { grid-template-columns: 1.2fr 1.5fr 1.5fr 1.5fr 1.2fr; }
+        .grid-normal { grid-template-columns: 1.2fr 1.4fr 1.4fr 1.4fr 1.5fr 1.2fr; }
         .grid-gridmode { grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr; }
         .grid-summarymode { grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr; }
         
@@ -260,7 +260,7 @@ function createTable(isGrid) {
         head.innerHTML = "<div>Hour</div><div>Demand</div><div>Supply</div><div>LS</div><div>%LS</div><div>Remark</div><div>Action</div>";
     } else {
         head.className = "table-header-row grid-normal";
-        head.innerHTML = "<div>Hour</div><div>Demand</div><div>Supply</div><div>Remark</div><div>Action</div>";
+        head.innerHTML = "<div>Hour</div><div>Demand</div><div>Supply</div><div>PF</div><div>Remark</div><div>Action</div>";
     }
     body.innerHTML = "";
     for(let i=1; i<=24; i++) {
@@ -268,7 +268,11 @@ function createTable(isGrid) {
         row.className = isGrid ? "grid-gridmode" : "grid-normal";
         row.style.display = "grid";
         let html = `<td>${displayHour(i)}</td><td><input type="number" id="d${i}"></td><td><input type="number" id="s${i}"></td>`;
-        if(isGrid) html += `<td><input type="number" id="ls${i}" disabled></td><td><input type="number" id="pls${i}" disabled></td>`;
+        if(isGrid) {
+            html += `<td><input type="number" id="ls${i}" disabled></td><td><input type="number" id="pls${i}" disabled></td>`;
+        } else {
+            html += `<td><input type="text" id="pf${i}" class="remark-input" disabled></td>`;
+        }
         html += `<td class="action-cell"><input class="remark-input" id="r${i}"></td>
                  <td class="action-cell">
                     <button id="btn${i}" onclick="saveHour(${i})">Save</button>
@@ -276,7 +280,7 @@ function createTable(isGrid) {
                  </td>`;
         row.innerHTML = html;
         body.appendChild(row);
-        if(!editable) lockRow(i, "", "", "", "View", isGrid, "", "");
+        if(!editable) lockRow(i, "", "", "", "", "View", false, "", "");
     }
 }
 
@@ -437,7 +441,7 @@ function fetchNormalData(ss, dateInput, requestId) {
         data.sort((a,b) => a.hour - b.hour);
 
         data.forEach(row => {
-            lockRow(row.hour, row.demand, row.supply, row.remarks, "Saved", false);
+            lockRow(row.hour, row.demand, row.supply, row.pf || "", row.remarks, "Saved", false);
             if (row.hour > lastSaved) lastSaved = row.hour;
         });
 
@@ -499,6 +503,7 @@ async function loadGridData(gridName, date, requestId) {
                 h,
                 dRounded,
                 sRounded,
+                "",
                 "Total",
                 "Grid",
                 true,
@@ -512,11 +517,19 @@ async function loadGridData(gridName, date, requestId) {
     if (isGraphView) updateChart();
 }
 
-function lockRow(h, d, s, r, btnText, isGrid, ls, pls) {
-    let dIn = document.getElementById("d" + h), sIn = document.getElementById("s" + h), rIn = document.getElementById("r" + h), btn = document.getElementById("btn" + h);
+function lockRow(h, d, s, pf, r, btnText, isGrid, ls, pls) {
+    let dIn = document.getElementById("d" + h), 
+        sIn = document.getElementById("s" + h), 
+        pfIn = document.getElementById("pf" + h), 
+        rIn = document.getElementById("r" + h), 
+        btn = document.getElementById("btn" + h);
     if(!dIn) return;
-    if(d !== "") dIn.value = d; if(s !== "") sIn.value = s; if(r !== "") rIn.value = r;
+    if(d !== "") dIn.value = d; 
+    if(s !== "") sIn.value = s; 
+    if(pf !== undefined && pf !== "" && pfIn) pfIn.value = pf; 
+    if(r !== "") rIn.value = r;
     dIn.disabled = sIn.disabled = rIn.disabled = btn.disabled = true;
+    if(pfIn) pfIn.disabled = true;
     if(isGrid) { 
         if(ls !== "") document.getElementById("ls" + h).value = ls; 
         if(pls !== "") document.getElementById("pls" + h).value = pls; 
